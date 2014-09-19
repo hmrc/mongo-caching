@@ -8,7 +8,7 @@ object HmrcBuild extends Build {
   import BuildDependencies._
   import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
 
-  lazy val appName = "mongo-cache"
+  lazy val appName = "mongo-caching"
   lazy val appVersion = "0.1.0"
 
   lazy val mongoCache = Project(appName, file("."))
