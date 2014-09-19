@@ -25,7 +25,7 @@ object HmrcBuild extends Build {
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
         "typesafe-snapshots" at "http://repo.typesafe.com/typesafe/snapshots/"
       ),
-      crossScalaVersions := Seq("2.11.2", "2.10.4")
+      crossScalaVersions := Seq("2.11.2")
     )
     .settings(SbtBuildInfo(): _*)
     .settings(SonatypeBuild(): _*)
