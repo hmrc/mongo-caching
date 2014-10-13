@@ -23,7 +23,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   private val expireAfter28DaysInSeconds = 60 * 60 * 24 * 7 * 4
 
   private def repo(name: String, expiresAfter: Long = expireAfter28DaysInSeconds) = new CacheMongoRepository(name, expiresAfter) {
-    await(super.ensureIndexes())
+    await(super.ensureIndexes)
   }
 
 

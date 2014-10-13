@@ -27,12 +27,14 @@ import scala.concurrent.Future
 trait TTLIndexing[A] {
   self : ReactiveRepository[A, Id] =>
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   val expireAfterSeconds: Long
 
   private lazy val LastUpdatedIndex = "lastUpdatedIndex"
   private lazy val OptExpireAfterSeconds = "expireAfterSeconds"
 
-  override def ensureIndexes(): Future[_] = {
+  override def ensureIndexes(implicit ec : scala.concurrent.ExecutionContext) : Future[_] = {
     import reactivemongo.bson.DefaultBSONHandlers._
 
     val indexes = collection.indexesManager.list()

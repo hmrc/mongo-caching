@@ -39,6 +39,8 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
   extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
   with CacheRepository with TTLIndexing[Cache] {
 
+  import scala.concurrent.ExecutionContext.Implicits.global
+
   override def createOrUpdate(id: Id, key: String, toCache: JsValue) = {
     withCurrentTime {
       implicit time =>
