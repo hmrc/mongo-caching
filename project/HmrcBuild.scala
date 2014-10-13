@@ -9,7 +9,7 @@ object HmrcBuild extends Build {
   import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
 
   lazy val appName = "mongo-caching"
-  lazy val appVersion = "0.1.0"
+  lazy val appVersion = "0.2.0-SNAPSHOT"
 
   lazy val mongoCache = Project(appName, file("."))
     .settings(version := appVersion)
@@ -34,8 +34,8 @@ object HmrcBuild extends Build {
 
 private object AppDependencies {
 
-  private val playReactivemongoVersion = "3.0.0"
-  private val simpleReactivemongoVersion = "2.0.1"
+  private val playReactivemongoVersion = "3.1.0"
+  private val simpleReactivemongoVersion = "2.1.0"
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % "2.3.4" % "provided",
@@ -44,7 +44,6 @@ private object AppDependencies {
 
     "uk.gov.hmrc" %% "play-reactivemongo" % playReactivemongoVersion,
     "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion,
-    "uk.gov.hmrc" %% "reactivemongo-json" % "1.0.0", 
     "uk.gov.hmrc" %% "http-exceptions" % "0.1.0"
   )
 
