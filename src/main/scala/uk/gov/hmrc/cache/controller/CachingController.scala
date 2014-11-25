@@ -18,7 +18,7 @@
 import play.api.libs.json.{Format, Writes}
 import play.api.mvc.{Controller, Result, Request}
 import play.modules.reactivemongo.MongoDbConnection
- import uk.gov.hmrc.cache.TimeToLive
+import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
 
 import scala.concurrent.Future
