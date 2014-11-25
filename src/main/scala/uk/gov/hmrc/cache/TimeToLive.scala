@@ -21,7 +21,7 @@ trait TimeToLive {
 
   import scala.concurrent.duration.{MINUTES, Duration}
 
-  private val fiveMinutes = 300000L
+  private val fiveMinutes = 5L
 
   lazy val defaultExpireAfter: Long = Duration(
     Play.current.configuration.getMilliseconds("cache.expiryInMinutes").getOrElse(fiveMinutes), MINUTES
