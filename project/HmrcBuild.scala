@@ -56,6 +56,7 @@ private object AppDependencies {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
         "org.scalatest" %% "scalatest" % "2.2.1" % scope,
+        "com.typesafe.play" %% "play-test" % "2.3.3" % scope,
         "org.pegdown" % "pegdown" % "1.4.2" % scope,
 
         "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion % scope classifier "tests"
