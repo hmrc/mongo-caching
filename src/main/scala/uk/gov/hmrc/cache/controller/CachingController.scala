@@ -18,7 +18,7 @@
 import play.api.libs.json.{Format, Writes}
 import play.api.mvc.{Controller, Result, Request}
 import play.modules.reactivemongo.MongoDbConnection
-import uk.gov.hmrc.cache.TimeToLive
+ import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
 
 import scala.concurrent.Future
@@ -52,5 +52,11 @@ trait CachingController extends MongoDbConnection with TimeToLive {
     extractBody { jsBody =>
       keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => Ok(toJson(result.updateType.savedValue)))
     }
+  }
+
+  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id).map {
+    case lastError if lastError.ok => Ok
+  }.recover {
+    case t  => InternalServerError(s"Failed to remove entity '$id' from source '$source'. Error: ${t.getMessage}")
   }
 }
