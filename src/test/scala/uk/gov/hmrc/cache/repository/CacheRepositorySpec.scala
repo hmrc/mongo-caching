@@ -51,6 +51,23 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       original.data.get \ "form1" shouldBe sampleFormData1Json
     }
 
+    "delete" should {
+      "be removed" in new TestSetup {
+        val repository = repo("delete")
+
+        val id: Id = "deleteMeId"
+
+        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val original = await(repository.findById(id)).get
+
+        original.id shouldBe id
+        original.data.get \ "form1" shouldBe sampleFormData1Json
+
+        repository.removeById(id)
+        val removed = await(repository.findById(id))
+        removed should be(empty)
+      }
+    }
 
     "be updated" in new TestSetup {
       val repository = repo("updateDataByKey")
@@ -112,18 +129,18 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
   private trait TestSetup {
     lazy val sampleFormData1Json = Json.parse( """{
-                                                   |"form-field-username":"John Densemore",
-                                                   |"form-field-password":"password1",
-                                                   |"form-field-address-number":42,
-                                                   |"form-field-address-one":"The Door"
-                                                   |}""".stripMargin)
+                                                 |"form-field-username":"John Densemore",
+                                                 |"form-field-password":"password1",
+                                                 |"form-field-address-number":42,
+                                                 |"form-field-address-one":"The Door"
+                                                 |}""".stripMargin)
 
     lazy val sampleFormData2Json = Json.parse( """{
-                                                   |"form-field-username":"Mark Dearnely",
-                                                   |"form-field-password":"ihaveaplan",
-                                                   |"form-field-address-number": 1,
-                                                   |"form-field-address-one":"HMRC Road"
-                                                   |}""".stripMargin)
+                                                 |"form-field-username":"Mark Dearnely",
+                                                 |"form-field-password":"ihaveaplan",
+                                                 |"form-field-address-number": 1,
+                                                 |"form-field-address-one":"HMRC Road"
+                                                 |}""".stripMargin)
   }
 
 }

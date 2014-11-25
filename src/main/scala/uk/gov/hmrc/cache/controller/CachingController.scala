@@ -53,4 +53,10 @@ trait CachingController extends MongoDbConnection with TimeToLive {
       keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => Ok(toJson(result.updateType.savedValue)))
     }
   }
+
+  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id).map {
+    case lastError if lastError.ok => NoContent
+  }.recover {
+    case t  => InternalServerError(s"Failed to remove entity '$id' from source '$source'. Error: ${t.getMessage}")
+  }
 }
