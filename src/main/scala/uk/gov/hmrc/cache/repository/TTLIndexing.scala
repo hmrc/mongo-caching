@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- package uk.gov.hmrc.cache.repository
+package uk.gov.hmrc.cache.repository
 
 import play.api.Logger
 import reactivemongo.api.indexes.{Index, IndexType}
@@ -25,7 +25,7 @@ import uk.gov.hmrc.mongo.ReactiveRepository
 import scala.concurrent.Future
 
 trait TTLIndexing[A] {
-  self : ReactiveRepository[A, Id] =>
+  self: ReactiveRepository[A, Id] =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -34,7 +34,7 @@ trait TTLIndexing[A] {
   private lazy val LastUpdatedIndex = "lastUpdatedIndex"
   private lazy val OptExpireAfterSeconds = "expireAfterSeconds"
 
-  override def ensureIndexes(implicit ec : scala.concurrent.ExecutionContext) : Future[_] = {
+  override def ensureIndexes(implicit ec: scala.concurrent.ExecutionContext): Future[Seq[Boolean]] = {
     import reactivemongo.bson.DefaultBSONHandlers._
 
     val indexes = collection.indexesManager.list()
@@ -61,13 +61,13 @@ trait TTLIndexing[A] {
   }
 
   private def ensureLastUpdated = {
-    collection.indexesManager.ensure(
+    Future.sequence(Seq(collection.indexesManager.ensure(
       Index(
         key = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),
         name = Some(LastUpdatedIndex),
         options = BSONDocument(OptExpireAfterSeconds -> expireAfterSeconds)
       )
-    )
+    )))
   }
 }
 
@@ -83,8 +83,8 @@ trait TTLIndexing[A] {
  * deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
  */
 sealed case class DeleteIndex(
-                        collection: String,
-                        index: String) extends Command[Int] {
+                               collection: String,
+                               index: String) extends Command[Int] {
   override def makeDocuments = BSONDocument(
     "deleteIndexes" -> BSONString(collection),
     "index" -> BSONString(index))
