@@ -9,7 +9,7 @@ object HmrcBuild extends Build {
   import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
 
   lazy val appName = "mongo-caching"
-  lazy val appVersion = "0.2.2"
+  lazy val appVersion = "0.3.0-SNAPSHOT"
 
   lazy val mongoCache = Project(appName, file("."))
     .settings(version := appVersion)
@@ -25,7 +25,7 @@ object HmrcBuild extends Build {
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
         "typesafe-snapshots" at "http://repo.typesafe.com/typesafe/snapshots/"
       ),
-      crossScalaVersions := Seq("2.11.2")
+      crossScalaVersions := Seq("2.11.5", "2.11.4")
     )
     .settings(SbtBuildInfo(): _*)
     .settings(SonatypeBuild(): _*)
@@ -34,17 +34,17 @@ object HmrcBuild extends Build {
 
 private object AppDependencies {
 
-  private val playReactivemongoVersion = "3.1.0"
-  private val simpleReactivemongoVersion = "2.1.0"
+  private val playReactivemongoVersion = "3.2.0"
+  private val simpleReactivemongoVersion = "2.1.2"
 
   val compile = Seq(
-    "com.typesafe.play" %% "play" % "2.3.4" % "provided",
+    "com.typesafe.play" %% "play" % "2.3.7" % "provided",
 
-    "uk.gov.hmrc" %% "time" % "1.0.1",
+    "uk.gov.hmrc" %% "time" % "1.1.0",
 
     "uk.gov.hmrc" %% "play-reactivemongo" % playReactivemongoVersion,
     "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion,
-    "uk.gov.hmrc" %% "http-exceptions" % "0.1.0"
+    "uk.gov.hmrc" %% "http-exceptions" % "0.2.0"
   )
 
   trait TestDependencies {
