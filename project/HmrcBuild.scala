@@ -19,7 +19,7 @@ object HmrcBuild extends Build {
       shellPrompt := ShellPrompt(appVersion),
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
-        Opts.resolver.sonatypeReleases
+        Resolver.bintrayRepo("hmrc", "releases")
       ),
       crossScalaVersions := Seq("2.11.6")
     )
@@ -29,17 +29,19 @@ object HmrcBuild extends Build {
 
 private object AppDependencies {
 
-  private val playReactivemongoVersion = "3.2.0"
+  import play.core.PlayVersion
+
+  private val playReactivemongoVersion = "3.3.0"
   private val simpleReactivemongoVersion = "2.1.2"
 
   val compile = Seq(
-    "com.typesafe.play" %% "play" % "2.387" % "provided",
-
-    "uk.gov.hmrc" %% "time" % "1.1.0",
+    "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
+    
+    "uk.gov.hmrc" %% "time" % "1.2.1",
 
     "uk.gov.hmrc" %% "play-reactivemongo" % playReactivemongoVersion,
     "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion,
-    "uk.gov.hmrc" %% "http-exceptions" % "0.2.0"
+    "uk.gov.hmrc" %% "http-exceptions" % "0.4.0"
   )
 
   trait TestDependencies {
@@ -51,7 +53,7 @@ private object AppDependencies {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
         "org.scalatest" %% "scalatest" % "2.2.4" % scope,
-        "com.typesafe.play" %% "play-test" % "2.3.8" % scope,
+        "com.typesafe.play" %% "play-test" % PlayVersion.current % scope,
         "org.pegdown" % "pegdown" % "1.4.2" % scope,
 
         "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion % scope classifier "tests"
