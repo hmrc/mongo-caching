@@ -5,7 +5,6 @@ object HmrcBuild extends Build {
 
   import uk.gov.hmrc.DefaultBuildSettings
   import DefaultBuildSettings._
-  import BuildDependencies._
   import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
 
   val appName = "mongo-caching"
@@ -20,15 +19,11 @@ object HmrcBuild extends Build {
       shellPrompt := ShellPrompt(appVersion),
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
-        Opts.resolver.sonatypeReleases,
-        Opts.resolver.sonatypeSnapshots,
-        "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
-        "typesafe-snapshots" at "http://repo.typesafe.com/typesafe/snapshots/"
+        Opts.resolver.sonatypeReleases
       ),
       crossScalaVersions := Seq("2.11.5", "2.11.4")
     )
     .settings(SbtBuildInfo(): _*)
-    .settings(SonatypeBuild(): _*)
 
 }
 
@@ -65,38 +60,4 @@ private object AppDependencies {
   }
 
   def apply() = compile ++ Test()
-}
-
-object SonatypeBuild {
-
-  import xerial.sbt.Sonatype._
-
-  def apply() = {
-    sonatypeSettings ++ Seq(
-      pomExtra := (<url>https://www.gov.uk/government/organisations/hm-revenue-customs</url>
-        <licenses>
-          <license>
-            <name>Apache 2</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-          </license>
-        </licenses>
-        <scm>
-          <connection>scm:git@github.com:hmrc/mongo-cache.git</connection>
-          <developerConnection>scm:git@github.com:hmrc/mongo-cache.git</developerConnection>
-          <url>git@github.com:hmrc/mongo-cache.git</url>
-        </scm>
-        <developers>
-          <developer>
-            <id>duncancrawford</id>
-            <name>Duncan Crawford</name>
-            <url>http://www.equalexperts.com</url>
-          </developer>
-          <developer>
-            <id>jakobgrunig</id>
-            <name>Jakob Grunig</name>
-            <url>http://www.equalexperts.com</url>
-          </developer>
-        </developers>)
-    )
-  }
 }
