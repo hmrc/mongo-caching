@@ -21,7 +21,7 @@ object HmrcBuild extends Build {
       resolvers := Seq(
         Opts.resolver.sonatypeReleases
       ),
-      crossScalaVersions := Seq("2.11.5", "2.11.4")
+      crossScalaVersions := Seq("2.11.6")
     )
     .settings(SbtBuildInfo(): _*)
 
@@ -33,7 +33,7 @@ private object AppDependencies {
   private val simpleReactivemongoVersion = "2.1.2"
 
   val compile = Seq(
-    "com.typesafe.play" %% "play" % "2.3.7" % "provided",
+    "com.typesafe.play" %% "play" % "2.387" % "provided",
 
     "uk.gov.hmrc" %% "time" % "1.1.0",
 
@@ -50,8 +50,8 @@ private object AppDependencies {
   object Test {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
-        "org.scalatest" %% "scalatest" % "2.2.1" % scope,
-        "com.typesafe.play" %% "play-test" % "2.3.7" % scope,
+        "org.scalatest" %% "scalatest" % "2.2.4" % scope,
+        "com.typesafe.play" %% "play-test" % "2.3.8" % scope,
         "org.pegdown" % "pegdown" % "1.4.2" % scope,
 
         "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion % scope classifier "tests"
