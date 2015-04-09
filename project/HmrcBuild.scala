@@ -32,7 +32,7 @@ private object AppDependencies {
   import play.core.PlayVersion
 
   private val playReactivemongoVersion = "3.3.0"
-  private val simpleReactivemongoVersion = "2.1.2"
+  private val simpleReactivemongoVersion = "2.5.0"
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
