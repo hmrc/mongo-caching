@@ -19,6 +19,7 @@ object HmrcBuild extends Build {
       shellPrompt := ShellPrompt(appVersion),
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
+        "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
         Resolver.bintrayRepo("hmrc", "releases")
       ),
       crossScalaVersions := Seq("2.11.6")
@@ -31,7 +32,7 @@ private object AppDependencies {
 
   import play.core.PlayVersion
 
-  private val playReactivemongoVersion = "3.3.0"
+  private val playReactivemongoVersion = "3.4.0"
   private val simpleReactivemongoVersion = "2.5.0"
 
   val compile = Seq(
