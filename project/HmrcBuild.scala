@@ -8,7 +8,7 @@ object HmrcBuild extends Build {
   import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
 
   val appName = "mongo-caching"
-  val appVersion = "0.5.0-SNAPSHOT"
+  val appVersion = "0.5.0"
 
   lazy val mongoCache = Project(appName, file("."))
     .settings(version := appVersion)
@@ -22,7 +22,8 @@ object HmrcBuild extends Build {
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
         Resolver.bintrayRepo("hmrc", "releases")
       ),
-      crossScalaVersions := Seq("2.11.6")
+      crossScalaVersions := Seq("2.11.6"),
+      ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) }
     )
     .settings(SbtBuildInfo(): _*)
 
@@ -32,8 +33,8 @@ private object AppDependencies {
 
   import play.core.PlayVersion
 
-  private val playReactivemongoVersion = "3.4.0"
-  private val simpleReactivemongoVersion = "2.5.0"
+  private val playReactivemongoVersion = "3.4.1"
+  private val simpleReactivemongoVersion = "2.6.1"
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
