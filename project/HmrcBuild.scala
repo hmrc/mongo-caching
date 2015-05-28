@@ -1,22 +1,18 @@
-import sbt._
 import sbt.Keys._
+import sbt._
+import uk.gov.hmrc.versioning.SbtGitVersioning
 
 object HmrcBuild extends Build {
 
-  import uk.gov.hmrc.DefaultBuildSettings
-  import DefaultBuildSettings._
-  import uk.gov.hmrc.{SbtBuildInfo, ShellPrompt}
+  import uk.gov.hmrc.DefaultBuildSettings._
+  import uk.gov.hmrc.SbtAutoBuildPlugin
 
   val appName = "mongo-caching"
-  val appVersion = "0.6.0-SNAPSHOT"
 
   lazy val mongoCache = Project(appName, file("."))
-    .settings(version := appVersion)
-    .settings(scalaSettings : _*)
-    .settings(defaultSettings() : _*)
+    .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
       targetJvm := "jvm-1.7",
-      shellPrompt := ShellPrompt(appVersion),
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
@@ -25,8 +21,6 @@ object HmrcBuild extends Build {
       crossScalaVersions := Seq("2.11.6"),
       ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) }
     )
-    .settings(SbtBuildInfo(): _*)
-
 }
 
 private object AppDependencies {
