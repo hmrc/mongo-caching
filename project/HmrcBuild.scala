@@ -35,7 +35,7 @@ object HmrcBuild extends Build {
 private object AppDependencies {
 
   private val playReactivemongoVersion = "3.2.0"
-  private val simpleReactivemongoVersion = "2.1.2"
+  private val simpleReactivemongoVersion = "2.4.0-SNAPSHOT" //"2.1.2" // TODO...RELEASE VERSION FIRST!!!
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % "2.3.7" % "provided",

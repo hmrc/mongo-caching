@@ -1,11 +1,11 @@
 /*
- * Copyright 2014 HM Revenue & Customs
+ * Copyright 2015 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,25 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- package uk.gov.hmrc.cache.model
+package uk.gov.hmrc.cache.model
 
 import play.api.libs.json._
-import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
+ import reactivemongo.bson.BSONObjectID
+ import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
 
-case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail()) extends Cacheable {
-
-  import org.joda.time.DateTime
-
-  def markUpdated(implicit updatedTime: DateTime) = copy(
-    modifiedDetails = modifiedDetails.updated(updatedTime)
-  )
-
-  def updateData(key: String, value: JsValue) = copy(data = transformData(key, value))
+ case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(), atomicId:Option[BSONObjectID]=None) extends Cacheable {
 }
 
 object Cache {
   import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 
+  final val DATA_ATTRIBUTE_NAME="data"
+
+  implicit val format = ReactiveMongoFormats.objectIdFormats
   implicit val cacheFormat = Json.format[Cache]
 
   val mongoFormats = ReactiveMongoFormats.mongoEntity {
