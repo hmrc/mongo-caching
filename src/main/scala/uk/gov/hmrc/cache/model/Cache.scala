@@ -14,25 +14,21 @@
  * limitations under the License.
  */
 
- package uk.gov.hmrc.cache.model
+package uk.gov.hmrc.cache.model
 
 import play.api.libs.json._
-import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
+ import reactivemongo.bson.BSONObjectID
+ import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
 
-case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail()) extends Cacheable {
-
-  import org.joda.time.DateTime
-
-  def markUpdated(implicit updatedTime: DateTime) = copy(
-    modifiedDetails = modifiedDetails.updated(updatedTime)
-  )
-
-  def updateData(key: String, value: JsValue) = copy(data = transformData(key, value))
+ case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(), atomicId:Option[BSONObjectID]=None) extends Cacheable {
 }
 
 object Cache {
   import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 
+  final val DATA_ATTRIBUTE_NAME="data"
+
+  implicit val format = ReactiveMongoFormats.objectIdFormats
   implicit val cacheFormat = Json.format[Cache]
 
   val mongoFormats = ReactiveMongoFormats.mongoEntity {

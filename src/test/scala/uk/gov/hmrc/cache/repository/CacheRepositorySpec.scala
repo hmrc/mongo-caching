@@ -16,20 +16,19 @@
 
 package uk.gov.hmrc.cache.repository
 
-import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.Json
+import org.scalatest.{BeforeAndAfterEach, Matchers, WordSpecLike}
+import play.api.libs.json.{JsValue, Json}
 import reactivemongo.bson.BSONLong
 import uk.gov.hmrc.cache.model.{Cache, Id}
-import uk.gov.hmrc.mongo.MongoSpecSupport
-import org.scalatest.{WordSpecLike, Matchers}
+import uk.gov.hmrc.mongo.{MongoSpecSupport, Updated}
 
 
 class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach with Eventually {
 
   import scala.concurrent.ExecutionContext.Implicits.global
-  import scala.concurrent.{Await, Future}
   import scala.concurrent.duration._
+  import scala.concurrent.{Await, Future}
 
   implicit val defaultTimeout = 5 seconds
 
@@ -42,29 +41,32 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
     await(super.ensureIndexes)
   }
 
-
   override protected def beforeEach() = {
     mongoConnectorForTest.db().drop
   }
 
   "create or update" should {
-    "be created" in new TestSetup {
-      val repository = repo("updateDataByKey")
 
-      val id: Id = "createMeId"
+    "create" should {
 
-      val notFound = await(repository.findById(id))
+      "insert a new record" in new TestSetup {
+        val repository = repo("updateDataByKey")
 
-      notFound shouldBe None
+        val id: Id = new Id("createMeId")
 
-      await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
-      val original = await(repository.findById(id)).get
+        val notFound = await(repository.findById(id))
 
-      original.id shouldBe id
-      Option(original.modifiedDetails.createdAt) shouldBe defined
-      Option(original.modifiedDetails.lastUpdated) shouldBe defined
+        notFound shouldBe None
 
-      original.data.get \ "form1" shouldBe sampleFormData1Json
+        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val original = await(repository.findById(id)).get
+
+        original.id shouldBe id
+        Option(original.modifiedDetails.createdAt) shouldBe defined
+        Option(original.modifiedDetails.lastUpdated) shouldBe defined
+
+        original.data.get \ "form1" shouldBe sampleFormData1Json
+      }
     }
 
     "delete" should {
@@ -85,25 +87,91 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
     }
 
-    "be updated" in new TestSetup {
-      val repository = repo("updateDataByKey")
+    "update operations " should {
+      "once a record has been created, allow new records associated with the same key to be created and updated within a single operation" in new TestSetup {
 
-      val id: Id = "updateMeId"
+        val repository = repo("updateDataByKey")
 
-      await(repository.save(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))))
-      val original = await(repository.findById(id)).get
+        val id: Id = "updateMeId"
 
-      await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val original = await(repository.findById(id)).get
 
-      val updated = await(repository.findById(id)).get
+        await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
 
-      updated.id shouldBe original.id
-      updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
-      updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
+        val updated = await(repository.findById(id)).get
 
-      updated.data.get \ "form1" shouldBe sampleFormData1Json
-      updated.data.get \ "form2" shouldBe sampleFormData2Json
+        updated.id shouldBe original.id
+        updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
+        updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
+
+        updated.data.get \ "form1" shouldBe sampleFormData1Json
+        updated.data.get \ "form2" shouldBe sampleFormData2Json
+
+        await(repository.createOrUpdate(id, "form2", sampleFormData2JsonA))
+        val updated2 = await(repository.findById(id)).get
+        updated2.data.get \ "form1" shouldBe sampleFormData1Json
+        updated2.data.get \ "form2" shouldBe sampleFormData2JsonA
+      }
     }
+
+    "update operations on legacy records (records which do not contain the new atomic Id) " should {
+
+      "updating a legacy record using atomics should result in a successful update with the atomicId attribute NOT being created" in new TestSetup {
+
+        val repository = repo("updateLegacy")
+        val id: Id = "updateLegacyId"
+
+        await(repository.save(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))))
+        val original = await(repository.findById(id)).get
+        original.atomicId shouldBe None
+
+        val updateCheck = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        updateCheck.updateType shouldBe a [Updated[_]]
+
+        val updated = await(repository.findById(id)).get
+
+        updated.id shouldBe original.id
+        updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
+
+        updated.data.get \ "form1" shouldBe sampleFormData1Json
+        updated.data.get \ "form2" shouldBe sampleFormData2Json
+
+        updated.atomicId shouldBe None
+      }
+
+    }
+
+    "delta update " should {
+      "demonstrate how mongo-caching clients (i.e. KeyStore) can accommodate delta updates for free" in new TestSetup {
+
+        val repository = repo("updateDataByKey")
+
+        val id: Id = "updateMeId"
+
+        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val original = await(repository.findById(id)).get
+
+        await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+
+        val updated = await(repository.findById(id)).get
+
+        updated.id shouldBe original.id
+        updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
+        updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
+
+        updated.data.get \ "form1" shouldBe sampleFormData1Json
+        updated.data.get \ "form2" shouldBe sampleFormData2Json
+
+        // Apply the delta change!
+        await(repository.createOrUpdate(id, "form2", sampleFormData2JsonDeltaOnlyUsername))
+
+        val updated2 = await(repository.findById(id)).get
+        updated2.data.get \ "form1" shouldBe sampleFormData1Json
+        updated2.data.get \ "form2" shouldBe sampleFormData2JsonA
+      }
+    }
+
   }
 
   "KeyStoreMongoRepository" should {
@@ -124,27 +192,26 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
     }
 
-
     "do not find document" in {
       val repository = repo("doNotFindRepo")
       val id: Id = "someId"
       await(repository.findById(id)).isEmpty shouldBe true
     }
 
-    //This test is intentionally commented out. Enable it locally to test that the removal of expired documents works.
-    "delete a document after it is not updated for longer than the \'expireAfter\' amount of time" ignore new TestSetup {
-      val repository = repo("expireDocument", 2)
-      val id = Id("expireTestId")
-      await(repository.createOrUpdate(id, "form", sampleFormData1Json))
-      Thread.sleep(60000)
-      val doc = await(repository.findById(id))
-      doc shouldBe None
-    }
+    // This test is intentionally commented out. Enable it locally to test that the removal of expired documents works.
+//    "delete a document after it is not updated for longer than the \'expireAfter\' amount of time" ignore new TestSetup {
+//      val repository = repo("expireDocument", 2)
+//      val id = Id("expireTestId")
+//      await(repository.createOrUpdate(id, "form", sampleFormData1Json))
+//      Thread.sleep(60000)
+//      val doc = await(repository.findById(id))
+//      doc shouldBe None
+//    }
   }
 
 
   private trait TestSetup {
-    lazy val sampleFormData1Json = Json.parse( """{
+    lazy val sampleFormData1Json: JsValue = Json.parse( """{
                                                  |"form-field-username":"John Densemore",
                                                  |"form-field-password":"password1",
                                                  |"form-field-address-number":42,
@@ -157,6 +224,18 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
                                                  |"form-field-address-number": 1,
                                                  |"form-field-address-one":"HMRC Road"
                                                  |}""".stripMargin)
+
+    lazy val sampleFormData2JsonA = Json.parse( """{
+                                                  |"form-field-username":"Different Username",
+                                                  |"form-field-password":"ihaveaplan",
+                                                  |"form-field-address-number": 1,
+                                                  |"form-field-address-one":"HMRC Road"
+                                                  |}""".stripMargin)
+
+    lazy val sampleFormData2JsonDeltaOnlyUsername = Json.parse( """{
+    |"form-field-username":"Different Username"
+    }""".stripMargin)
+
   }
 
 }
