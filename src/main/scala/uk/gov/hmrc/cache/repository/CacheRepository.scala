@@ -16,13 +16,16 @@
 
  package uk.gov.hmrc.cache.repository
 
-import play.api.libs.json.{Format, JsObject, JsValue}
+import play.api.libs.json.{JsArray, Format, JsObject, JsValue}
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
+import reactivemongo.bson._
+import reactivemongo.json.BSONFormats
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
 
-import scala.concurrent.{ExecutionContext, Future}
+ import scala.concurrent.{ExecutionContext, Future}
+
 
 trait CacheRepository extends Repository[Cache, Id] {
 
@@ -38,36 +41,58 @@ object CacheRepository extends MongoDbConnection {
 
 class CacheMongoRepository(collName: String, override val expireAfterSeconds: Long, cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB)
   extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
-  with CacheRepository with TTLIndexing[Cache] {
+  with CacheRepository with TTLIndexing[Cache]
+  with AtomicUpdate[Cache]
+  with BSONBuilderHelpers {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
+  def findByIdBSON(id: Id) = BSONDocument("id" -> BSONString(id.id))
+
+  private def modifierForCrudCredentialsBSON(time: Long): BSONDocument = BSONDocument(
+    "$set" -> BSONDocument("modifiedDetails.lastUpdated" -> BSONDateTime(time)),
+    "$setOnInsert" -> BSONDocument("modifiedDetails.createdAt" -> BSONDateTime(time))
+  )
+
+  def allKeys(json: JsValue): Seq[String] = json match {
+    case JsObject(fields) => fields.map(_._1) ++ fields.map(_._2).flatMap(allKeys)
+    case JsArray(as) => as.flatMap(allKeys)
+    case _ => Seq.empty[String]
+  }
+
+  // Build the key that will be used to write to mongo.
+  def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
+
   override def createOrUpdate(id: Id, key: String, toCache: JsValue) = {
+
     withCurrentTime {
+
       implicit time =>
-        saveOrUpdate(
-          findQuery = findById(id),
-          ifNotFound = Future.successful(Cache(id, Some(JsObject(Seq(key -> toCache))))),
-          modifiers = _.updateData(key, toCache).markUpdated
+
+        // Build the BSON update command based on the contents of the JSValue.
+        val toCacheUpdateDocument = for {
+          k <- allKeys(toCache)
+        } yield (set(BSONDocument(buildKey(key,k) -> BSONFormats.toBSON(toCache \ k).get)))
+
+        // Generate a single BSON update operation to be applied to mongo for the collection.
+        val modifier = List(
+          modifierForCrudCredentialsBSON(time.getMillis),
+          setOnInsert(BSONDocument("_id" -> BSONString(id.id)))
         )
+        val modifiers=(toCacheUpdateDocument.toList ::: modifier).reduceLeft(_ ++ _)
+
+        atomicSaveOrUpdate(BSONDocument("_id" -> BSONString(id.id)), modifiers, upsert = true, "atomicId").map(_.getOrElse(throw atomicError))
     }
   }
 
-  override protected def saveOrUpdate(findQuery: => Future[Option[Cache]], ifNotFound: => Future[Cache], modifiers: (Cache) => Cache = a => a)(implicit ec: ExecutionContext): Future[DatabaseUpdate[Cache]] = {
-    withCurrentTime {
-      implicit time =>
-        val updateTypeF = findQuery.flatMap {
-          case Some(existingValue) => Future.successful(Updated(existingValue, modifiers(existingValue)))
-          case None => ifNotFound.map(newValue => Saved(modifiers(newValue))): Future[UpdateType[Cache]]
-        }
+  private def atomicError = new EntityNotFoundException(s"Failed to receive updated object from atomics!")
 
-        updateTypeF.flatMap {
-          updateType =>
-            save(updateType.savedValue).map {
-              lastErr =>
-                DatabaseUpdate(writeResult = lastErr, updateType)
-            }
-        }
+  override def isInsertion(newRecordId: BSONObjectID, oldRecord: Cache) = {
+
+    oldRecord.data match {
+      case Some(id) => newRecordId.equals(id)
+      case _        => false
     }
   }
+
 }
