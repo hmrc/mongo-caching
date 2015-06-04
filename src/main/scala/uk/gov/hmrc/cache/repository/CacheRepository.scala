@@ -16,7 +16,7 @@
 
  package uk.gov.hmrc.cache.repository
 
-import play.api.libs.json.{JsArray, Format, JsObject, JsValue}
+import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
 import reactivemongo.bson._
@@ -24,7 +24,7 @@ import reactivemongo.json.BSONFormats
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
 
- import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 
 trait CacheRepository extends Repository[Cache, Id] {
@@ -47,21 +47,26 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  def findByIdBSON(id: Id) = BSONDocument("id" -> BSONString(id.id))
+  final val AtomicId="atomicId"
+  final val Id="_id"
+
+  private def findByIdBSON(id: Id) = BSONDocument(Id -> BSONString(id.id))
 
   private def modifierForCrudCredentialsBSON(time: Long): BSONDocument = BSONDocument(
     "$set" -> BSONDocument("modifiedDetails.lastUpdated" -> BSONDateTime(time)),
     "$setOnInsert" -> BSONDocument("modifiedDetails.createdAt" -> BSONDateTime(time))
   )
 
-  def allKeys(json: JsValue): Seq[String] = json match {
+  private def allKeys(json: JsValue): Seq[String] = json match {
     case JsObject(fields) => fields.map(_._1) ++ fields.map(_._2).flatMap(allKeys)
     case JsArray(as) => as.flatMap(allKeys)
     case _ => Seq.empty[String]
   }
 
-  // Build the key that will be used to write to mongo.
-  def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
+  private def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
+  private def buildKey(a:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a"
+
+  private def unset(key:String) = BSONDocument("$unset" -> BSONDocument(buildKey(key) -> ""))
 
   override def createOrUpdate(id: Id, key: String, toCache: JsValue) = {
 
@@ -70,26 +75,28 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
       implicit time =>
 
         // Build the BSON update command based on the contents of the JSValue.
-        val toCacheUpdateDocument = for {
-          k <- allKeys(toCache)
-        } yield (set(BSONDocument(buildKey(key,k) -> BSONFormats.toBSON(toCache \ k).get)))
+        val toCacheUpdateDocument = {
+          val update = for {
+            k <- allKeys(toCache)
+          } yield (set(BSONDocument(buildKey(key, k) -> BSONFormats.toBSON(toCache \ k).get)))
+
+          if (update.isEmpty) Seq(unset(key)) else update
+        }
 
         // Generate a single BSON update operation to be applied to mongo for the collection.
         val modifier = List(
           modifierForCrudCredentialsBSON(time.getMillis),
-          setOnInsert(BSONDocument("_id" -> BSONString(id.id)))
+          setOnInsert(BSONDocument(Id -> BSONString(id.id)))
         )
         val modifiers=(toCacheUpdateDocument.toList ::: modifier).reduceLeft(_ ++ _)
-
-        atomicSaveOrUpdate(BSONDocument("_id" -> BSONString(id.id)), modifiers, upsert = true, "atomicId").map(_.getOrElse(throw atomicError))
+        atomicSaveOrUpdate(findByIdBSON(id.id), modifiers, upsert = true, AtomicId).map(_.getOrElse(throw atomicError))
     }
   }
 
   private def atomicError = new EntityNotFoundException(s"Failed to receive updated object from atomics!")
 
   override def isInsertion(newRecordId: BSONObjectID, oldRecord: Cache) = {
-
-    oldRecord.data match {
+    oldRecord.atomicId match {
       case Some(id) => newRecordId.equals(id)
       case _        => false
     }

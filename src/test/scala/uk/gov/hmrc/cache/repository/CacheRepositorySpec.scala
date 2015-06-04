@@ -19,9 +19,9 @@ package uk.gov.hmrc.cache.repository
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterEach, Matchers, WordSpecLike}
 import play.api.libs.json.{JsValue, Json}
-import reactivemongo.bson.BSONLong
+import reactivemongo.bson.{BSONObjectID, BSONLong}
 import uk.gov.hmrc.cache.model.{Cache, Id}
-import uk.gov.hmrc.mongo.{MongoSpecSupport, Updated}
+import uk.gov.hmrc.mongo.{Saved, MongoSpecSupport, Updated}
 
 
 class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach with Eventually {
@@ -51,20 +51,20 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
       "insert a new record" in new TestSetup {
         val repository = repo("updateDataByKey")
-
         val id: Id = new Id("createMeId")
 
         val notFound = await(repository.findById(id))
-
         notFound shouldBe None
 
-        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        insertCheck.updateType shouldBe a [Saved[_]]
+
         val original = await(repository.findById(id)).get
 
         original.id shouldBe id
         Option(original.modifiedDetails.createdAt) shouldBe defined
         Option(original.modifiedDetails.lastUpdated) shouldBe defined
-
+        Option(original.atomicId.get) shouldBe defined
         original.data.get \ "form1" shouldBe sampleFormData1Json
       }
     }
@@ -75,9 +75,10 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val id: Id = "deleteMeId"
 
-        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
-        val original = await(repository.findById(id)).get
+        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        insertCheck.updateType shouldBe a [Saved[_]]
 
+        val original = await(repository.findById(id)).get
         original.id shouldBe id
         original.data.get \ "form1" shouldBe sampleFormData1Json
 
@@ -91,16 +92,16 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       "once a record has been created, allow new records associated with the same key to be created and updated within a single operation" in new TestSetup {
 
         val repository = repo("updateDataByKey")
-
         val id: Id = "updateMeId"
 
-        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        insertCheck.updateType shouldBe a [Saved[_]]
         val original = await(repository.findById(id)).get
 
-        await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        val updateCheck = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        updateCheck.updateType shouldBe a [Updated[_]]
 
         val updated = await(repository.findById(id)).get
-
         updated.id shouldBe original.id
         updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
@@ -117,7 +118,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
     "update operations on legacy records (records which do not contain the new atomic Id) " should {
 
-      "updating a legacy record using atomics should result in a successful update with the atomicId attribute NOT being created" in new TestSetup {
+      "result in a successful update with the atomicId attribute NOT being created" in new TestSetup {
 
         val repository = repo("updateLegacy")
         val id: Id = "updateLegacyId"
@@ -130,17 +131,61 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updateCheck.updateType shouldBe a [Updated[_]]
 
         val updated = await(repository.findById(id)).get
+        updated.atomicId shouldBe None
 
         updated.id shouldBe original.id
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
 
         updated.data.get \ "form1" shouldBe sampleFormData1Json
         updated.data.get \ "form2" shouldBe sampleFormData2Json
-
-        updated.atomicId shouldBe None
       }
-
     }
+
+    "inserting a new record with a key which contains an empty JSValue " should {
+
+      "create a new record with no key" in new TestSetup {
+
+        val repository = repo("emptyJSValue")
+        val id: Id = "testEmptyJsValueId"
+
+        val updateCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        updateCheck.updateType shouldBe a [Saved[_]]
+
+        val original = await(repository.findById(id)).get
+        original.atomicId.get shouldBe a [BSONObjectID]
+        original.data shouldBe None
+      }
+    }
+
+    "applying empty JSON on an existing key " should {
+
+      "only clear the JSON contents of the key that was supplied with empty JSon" in new TestSetup {
+
+        val repository = repo("unsetJSValue")
+        val id: Id = "testClearJsValueId"
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        insertCheck.updateType shouldBe a [Saved[_]]
+
+        val insertCheck2 = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        insertCheck2.updateType shouldBe a [Updated[_]]
+
+        val original = await(repository.findById(id)).get
+        original.atomicId.get shouldBe a [BSONObjectID]
+        original.data.get \ "form1" shouldBe sampleFormData1Json
+        original.data.get \ "form2" shouldBe sampleFormData2Json
+
+        val updateCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        updateCheck.updateType shouldBe a [Updated[_]]
+
+        val updated = await(repository.findById(id)).get
+        updated.atomicId.get shouldBe a [BSONObjectID]
+
+        (updated.data.get \ "form1").asOpt[String] shouldBe None
+        updated.data.get \ "form2" shouldBe sampleFormData2Json
+      }
+    }
+
 
     "delta update " should {
       "demonstrate how mongo-caching clients (i.e. KeyStore) can accommodate delta updates for free" in new TestSetup {
@@ -153,7 +198,6 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val original = await(repository.findById(id)).get
 
         await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
-
         val updated = await(repository.findById(id)).get
 
         updated.id shouldBe original.id
@@ -171,7 +215,6 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updated2.data.get \ "form2" shouldBe sampleFormData2JsonA
       }
     }
-
   }
 
   "KeyStoreMongoRepository" should {
