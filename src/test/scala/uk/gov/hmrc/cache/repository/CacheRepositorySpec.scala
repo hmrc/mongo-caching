@@ -252,13 +252,18 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 //    }
   }
 
-
   private trait TestSetup {
     lazy val sampleFormData1Json: JsValue = Json.parse( """{
                                                  |"form-field-username":"John Densemore",
                                                  |"form-field-password":"password1",
                                                  |"form-field-address-number":42,
-                                                 |"form-field-address-one":"The Door"
+                                                 |"form-field-address-one":"The Door",
+                                                 |"inner1" : {
+                                                 |  "a" : "inner data depth 1",
+                                                 |  "inner2" : {
+                                                 |    "b" : "inner data depth 2"
+                                                 |  }
+                                                 | }
                                                  |}""".stripMargin)
 
     lazy val sampleFormData2Json = Json.parse( """{

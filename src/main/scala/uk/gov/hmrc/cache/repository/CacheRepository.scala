@@ -58,7 +58,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
   )
 
   private def allKeys(json: JsValue): Seq[String] = json match {
-    case JsObject(fields) => fields.map(_._1) ++ fields.map(_._2).flatMap(allKeys)
+    case JsObject(fields) => fields.map(_._1)
     case JsArray(as) => as.flatMap(allKeys)
     case _ => Seq.empty[String]
   }
