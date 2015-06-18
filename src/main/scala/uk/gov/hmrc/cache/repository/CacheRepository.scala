@@ -66,7 +66,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
   private def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
   private def buildKey(a:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a"
 
-  private def unset(key:String) = BSONDocument("$set" -> BSONDocument(buildKey(key) -> "{}"))
+  private def empty(key:String) = BSONDocument("$set" -> BSONDocument(buildKey(key) -> "{}"))
 
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
@@ -80,7 +80,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
             k <- allKeys(toCache)
           } yield (set(BSONDocument(buildKey(key, k) -> BSONFormats.toBSON(toCache \ k).get)))
 
-          if (update.isEmpty) Seq(unset(key)) else update
+          if (update.isEmpty) Seq(empty(key)) else update
         }
 
         // Generate a single BSON update operation to be applied to mongo for the collection.
