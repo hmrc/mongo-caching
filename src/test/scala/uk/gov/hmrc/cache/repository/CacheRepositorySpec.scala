@@ -143,7 +143,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
     "inserting a new record with a key which contains an empty JSValue " should {
 
-      "create a new record with no key" in new TestSetup {
+      "create a new record with an empty key" in new TestSetup {
 
         val repository = repo("emptyJSValue")
         val id: Id = "testEmptyJsValueId"
@@ -153,7 +153,12 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
-        original.data shouldBe None
+
+        val emptyForm = Json.parse( """{
+                      |"form1":"{}"
+                      |}""".stripMargin)
+
+        original.data shouldBe Some(emptyForm)
       }
     }
 
@@ -181,7 +186,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val updated = await(repository.findById(id)).get
         updated.atomicId.get shouldBe a [BSONObjectID]
 
-        (updated.data.get \ "form1").asOpt[String] shouldBe None
+        (updated.data.get \ "form1").asOpt[String] shouldBe Some("{}")
         updated.data.get \ "form2" shouldBe sampleFormData2Json
       }
     }

@@ -66,9 +66,9 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
   private def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
   private def buildKey(a:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a"
 
-  private def unset(key:String) = BSONDocument("$unset" -> BSONDocument(buildKey(key) -> ""))
+  private def unset(key:String) = BSONDocument("$set" -> BSONDocument(buildKey(key) -> "{}"))
 
-  override def createOrUpdate(id: Id, key: String, toCache: JsValue) = {
+  override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
     withCurrentTime {
 
