@@ -65,8 +65,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
 
   private def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
   private def buildKey(a:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a"
-
-  private def empty(key:String) = BSONDocument("$set" -> BSONDocument(buildKey(key) -> "{}"))
+  private def unset(key:String) = BSONDocument("$unset" -> BSONDocument(buildKey(key) -> ""))
 
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
@@ -74,13 +73,34 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
 
       implicit time =>
 
-        // Build the BSON update command based on the contents of the JSValue.
-        val toCacheUpdateDocument = {
-          val update = for {
-            k <- allKeys(toCache)
-          } yield (set(BSONDocument(buildKey(key, k) -> BSONFormats.toBSON(toCache \ k).get)))
+        // Build the BSON update command based on the type of the JsValue.
+        val toCacheUpdateDocument = toCache match {
 
-          if (update.isEmpty) Seq(empty(key)) else update
+          case stringValue:JsString =>
+            List(set(BSONDocument(buildKey(key) -> BSONString(stringValue.value))))
+
+          case intValue:JsNumber =>
+            List(set(BSONDocument(buildKey(key) -> BSONDouble(intValue.value.toDouble))))
+
+          case booleanValue:JsBoolean =>
+            List(set(BSONDocument(buildKey(key) -> BSONBoolean(booleanValue.value))))
+
+          case arrayValue:JsArray =>
+            List(set(BSONDocument(buildKey(key) -> BSONArray(arrayValue.value.map { value =>
+              BSONFormats.toBSON(value) match {
+                case JsSuccess(bson, _) => bson
+                case JsError(err) => throw new RuntimeException(s"Failed to convert JSArray for key $key! Error ${err.toString}")
+              }
+            }))))
+
+          case jsObject:JsObject =>
+            val update = for {
+              k <- allKeys(jsObject)
+            } yield (set(BSONDocument (buildKey (key, k) -> BSONFormats.toBSON (toCache \ k).get) ) )
+            if (update.isEmpty) Seq (unset(key) ) else update
+
+          // JSNUll is not covered!
+          case _ => throw new IllegalArgumentException("The JsValue is not recognized!")
         }
 
         // Generate a single BSON update operation to be applied to mongo for the collection.
