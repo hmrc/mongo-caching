@@ -16,7 +16,7 @@
 
  package uk.gov.hmrc.cache.controller
 
-import play.api.libs.json.{Format, Writes}
+import play.api.libs.json._
 import play.api.mvc.{Controller, Result, Request}
 import play.modules.reactivemongo.MongoDbConnection
 import uk.gov.hmrc.cache.TimeToLive
@@ -24,7 +24,7 @@ import uk.gov.hmrc.cache.model.Cache
 
 import scala.concurrent.Future
 
-trait CachingController extends MongoDbConnection with TimeToLive {
+ trait CachingController extends MongoDbConnection with TimeToLive {
   self: Controller =>
 
   import play.api.libs.json.JsValue
@@ -39,7 +39,7 @@ trait CachingController extends MongoDbConnection with TimeToLive {
   private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, cacheMongoFormats)
 
   def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id).map {
-    case Some(cacheable) => Ok(toJson(cacheable))
+    case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))
     case _ => NotFound("No entity found")
   }
 
@@ -48,10 +48,20 @@ trait CachingController extends MongoDbConnection with TimeToLive {
     case _ => NotFound("No entity found")
   }
 
-  def add(source: String, id: String, key: String)(extractBody: ((JsValue) => Future[Result]) => Future[Result])(implicit request: Request[JsValue]) = {
+  private def safeConversion(cacheable:Cache) = {
+    cacheable.data match {
+      case None => cacheable.copy(data = Some(Json.parse("{}")))
+      case _ => cacheable
+    }
+  }
+
+  def add(source: String, id: String, key: String)(extractBody: ((JsValue) => Future[Result]) => Future[Result])(implicit request: Request[JsValue]): Future[Result] = {
     if (key contains '.') throw new BadRequestException("A cacheable key cannot contain dots")
     extractBody { jsBody =>
-      keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => Ok(toJson(result.updateType.savedValue)))
+
+      keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => {
+        Ok(toJson(safeConversion(result.updateType.savedValue)))
+      })
     }
   }
 

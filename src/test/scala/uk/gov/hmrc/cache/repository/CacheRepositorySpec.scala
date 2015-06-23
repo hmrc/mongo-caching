@@ -89,6 +89,120 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
     }
 
     "update operations " should {
+
+      "write and read JsValue type JsNumber (Integer) and verify same key can be removed with empty json object" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "numberId"
+        val jsonNumber = Json.toJson(123)
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonNumber))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonNumber
+
+        val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        unsetCheck.updateType shouldBe a[Updated[_]]
+        val updateCheck = await(repository.findById(id)).get
+        updateCheck.data shouldBe Some(emptyJsonObject)
+      }
+
+      "write and read JsValue type JsNumber Double" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "numberDoubleId"
+        val jsonNumber = Json.toJson(999.99)
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonNumber))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+
+        original.data.get \ "form1" shouldBe jsonNumber
+      }
+
+      "write and read JsValue type JsString" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "stringId"
+        val jsonString = Json.toJson("some simple string")
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonString))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonString
+      }
+
+      "write and read JsValue type JsBoolean" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "booleanId"
+        val jsonBoolean = Json.toJson(true)
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonBoolean))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonBoolean
+      }
+
+      "write and read JsValue type JsArray Integer" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "arrayIntId"
+        val jsonArray = Json.toJson(List(1,2,3,4))
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonArray
+      }
+
+      "write and read JsValue type JsArray String" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "arrayStringId"
+        val jsonArray = Json.toJson(List("apple","pear","orange"))
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonArray
+      }
+
+      "write and read JsValue type JsArray Double" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "arrayDoubleId"
+        val jsonArray = Json.toJson(List(123.11,456.22,789.33))
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonArray
+      }
+
+      "write and read a JsValue type JsArray user-defined" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "arrayUserDefinedId"
+        case class UserDefined(a:String, b:String, c:Int)
+        implicit val userDefinedFormats = Json.format[UserDefined]
+
+        val jsonArray = Json.toJson(List(UserDefined("1","2",3),UserDefined("4","5",6)))
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        insertCheck.updateType shouldBe a[Saved[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "form1" shouldBe jsonArray
+      }
+
+      "Saving a key with empty json will create a mongo record with no data attribute, " +
+        "saving the same key with non empty json will update the record and create the data attribute with the specified key" in new TestSetup {
+
+        val repository = repo("simpledata")
+        val id: Id = "unsetId"
+
+        await(repository.createOrUpdate(id, "searched-person", Json.parse("{}")))
+        val shouldHaveNoData = await(repository.findById(id)).get
+        shouldHaveNoData.data shouldBe None
+
+        val insertCheck = await(repository.createOrUpdate(id, "searched-person", sampleFormData1Json))
+        insertCheck.updateType shouldBe a[Updated[_]]
+        val original = await(repository.findById(id)).get
+        original.data.get \ "searched-person" shouldBe sampleFormData1Json
+      }
+
       "once a record has been created, allow new records associated with the same key to be created and updated within a single operation" in new TestSetup {
 
         val repository = repo("updateDataByKey")
@@ -141,33 +255,51 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
     }
 
-    "inserting a new record with a key which contains an empty JSValue " should {
+    "inserting a new record with a key which contains an empty JsValue " should {
 
-      "create a new record with an empty key" in new TestSetup {
+      "create a new record with an empty key and no data attribute" in new TestSetup {
 
         val repository = repo("emptyJSValue")
         val id: Id = "testEmptyJsValueId"
 
-        val updateCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
         updateCheck.updateType shouldBe a [Saved[_]]
 
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
 
-        val emptyForm = Json.parse( """{
-                      |"form1":"{}"
-                      |}""".stripMargin)
-
-        original.data shouldBe Some(emptyForm)
+        original.data shouldBe None
       }
     }
 
     "applying empty JSON on an existing key " should {
 
-      "only clear the JSON contents of the key that was supplied with empty JSon" in new TestSetup {
+      "unset the JSON contents of the key and verify the records data attibute contains no keys" in new TestSetup {
 
         val repository = repo("unsetJSValue")
-        val id: Id = "testClearJsValueId"
+        val id: Id = "testClearJsValueIdA"
+
+        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        insertCheck.updateType shouldBe a [Saved[_]]
+
+        val original = await(repository.findById(id)).get
+        original.atomicId.get shouldBe a [BSONObjectID]
+        original.data.get \ "form1" shouldBe sampleFormData1Json
+
+        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
+        updateCheck.updateType shouldBe a [Updated[_]]
+
+        val updated = await(repository.findById(id)).get
+        updated.atomicId.get shouldBe a [BSONObjectID]
+
+        updated.data.get shouldBe emptyJsonObject
+      }
+
+
+      "only unset the JSON contents of the key that was supplied with empty json object and leave the other key untouched" in new TestSetup {
+
+        val repository = repo("unsetJSValue")
+        val id: Id = "testClearJsValueIdB"
 
         val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
         insertCheck.updateType shouldBe a [Saved[_]]
@@ -180,20 +312,20 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         original.data.get \ "form1" shouldBe sampleFormData1Json
         original.data.get \ "form2" shouldBe sampleFormData2Json
 
-        val updateCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
         updateCheck.updateType shouldBe a [Updated[_]]
 
         val updated = await(repository.findById(id)).get
         updated.atomicId.get shouldBe a [BSONObjectID]
 
-        (updated.data.get \ "form1").asOpt[String] shouldBe Some("{}")
+        (updated.data.get \ "form1").asOpt[String] shouldBe None
         updated.data.get \ "form2" shouldBe sampleFormData2Json
       }
     }
 
 
     "delta update " should {
-      "demonstrate how mongo-caching clients (i.e. KeyStore) can accommodate delta updates for free" in new TestSetup {
+      "demonstrate how clients (i.e. front-end apps) can incorporate delta updates for free" in new TestSetup {
 
         val repository = repo("updateDataByKey")
 
@@ -258,6 +390,9 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   }
 
   private trait TestSetup {
+
+    val emptyJsonObject = Json.parse("{}")
+
     lazy val sampleFormData1Json: JsValue = Json.parse( """{
                                                  |"form-field-username":"John Densemore",
                                                  |"form-field-password":"password1",
