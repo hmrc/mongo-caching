@@ -12,7 +12,6 @@ object HmrcBuild extends Build {
   lazy val mongoCache = Project(appName, file("."))
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
-      targetJvm := "jvm-1.7",
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
@@ -33,7 +32,7 @@ private object AppDependencies {
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
     
-    "uk.gov.hmrc" %% "time" % "1.2.1",
+    "uk.gov.hmrc" %% "time" % "1.4.0",
 
     "uk.gov.hmrc" %% "play-reactivemongo" % playReactivemongoVersion,
     "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion,
