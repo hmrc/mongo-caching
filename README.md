@@ -11,8 +11,9 @@ Include the following dependency in your SBT build
 ``` scala
 resolvers += Resolver.bintrayRepo("hmrc", "releases")
 
-libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "x.x.x"
+libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "[INSERT_VERSION]"
 ```
+For Java 7 use a version <= 0.7.1
 
 ## License ##
  
