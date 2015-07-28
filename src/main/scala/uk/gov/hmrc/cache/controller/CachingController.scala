@@ -30,7 +30,6 @@ import scala.concurrent.Future
 
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
-  import reactivemongo.api.ReadPreference.secondaryPreferred
   import uk.gov.hmrc.cache.repository.CacheRepository
   import uk.gov.hmrc.play.http.BadRequestException
 
@@ -40,12 +39,12 @@ import scala.concurrent.Future
 
   private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, cacheMongoFormats)
 
-  def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id, secondaryPreferred).map {
+  def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id).map {
     case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))
     case _ => NotFound("No entity found")
   }
 
-  def dataKeys(source: String, id: String) = keyStoreRepository(source).findById(id, secondaryPreferred).map {
+  def dataKeys(source: String, id: String) = keyStoreRepository(source).findById(id).map {
     case Some(ks) => Ok(toJson(ks.dataKeys()))
     case _ => NotFound("No entity found")
   }
