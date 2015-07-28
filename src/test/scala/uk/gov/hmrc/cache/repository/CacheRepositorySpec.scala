@@ -18,10 +18,10 @@ package uk.gov.hmrc.cache.repository
 
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterEach, Matchers, WordSpecLike}
-import play.api.libs.json.{JsValue, Json}
-import reactivemongo.bson.{BSONObjectID, BSONLong}
+import play.api.libs.json.Json
+import reactivemongo.bson.{BSONLong, BSONObjectID}
 import uk.gov.hmrc.cache.model.{Cache, Id}
-import uk.gov.hmrc.mongo.{Saved, MongoSpecSupport, Updated}
+import uk.gov.hmrc.mongo.{MongoSpecSupport, Saved, Updated}
 
 
 class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach with Eventually {
@@ -103,7 +103,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
         unsetCheck.updateType shouldBe a[Updated[_]]
         val updateCheck = await(repository.findById(id)).get
-        updateCheck.data shouldBe Some(emptyJsonObject)
+        updateCheck.data.get \ "form1" shouldBe emptyJsonObject
       }
 
       "write and read JsValue type JsNumber Double" in new TestSetup {
@@ -147,7 +147,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
+        val original: Cache = await(repository.findById(id)).get
         original.data.get \ "form1" shouldBe jsonArray
       }
 
@@ -176,10 +176,13 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       "write and read a JsValue type JsArray user-defined" in new TestSetup {
         val repository = repo("simpledata")
         val id: Id = "arrayUserDefinedId"
-        case class UserDefined(a:String, b:String, c:Int)
-        implicit val userDefinedFormats = Json.format[UserDefined]
 
-        val jsonArray = Json.toJson(List(UserDefined("1","2",3),UserDefined("4","5",6)))
+        case class SubUserDefined(a:String)
+        case class UserDefined(a:String, b:String, c:Int, d:List[SubUserDefined])
+        implicit val userDefinedFormats = Json.format[SubUserDefined]
+        implicit val userDefinedFormats2 = Json.format[UserDefined]
+
+        val jsonArray = Json.toJson(List(UserDefined("1","2",3, List(SubUserDefined("b"),SubUserDefined("cb"))),UserDefined("4","5",6,List(SubUserDefined("d")))))
 
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
@@ -195,7 +198,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         await(repository.createOrUpdate(id, "searched-person", Json.parse("{}")))
         val shouldHaveNoData = await(repository.findById(id)).get
-        shouldHaveNoData.data shouldBe None
+        shouldHaveNoData.data.get  \ "searched-person"  shouldBe Json.parse("{}")
 
         val insertCheck = await(repository.createOrUpdate(id, "searched-person", sampleFormData1Json))
         insertCheck.updateType shouldBe a[Updated[_]]
@@ -255,9 +258,9 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
     }
 
-    "inserting a new record with a key which contains an empty JsValue " should {
+    "inserting a new key which contains an empty JsValue " should {
 
-      "create a new record with an empty key and no data attribute" in new TestSetup {
+      "create a new record with a key with an empty Json object" in new TestSetup {
 
         val repository = repo("emptyJSValue")
         val id: Id = "testEmptyJsValueId"
@@ -268,13 +271,13 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
 
-        original.data shouldBe None
+        original.data.get \ "form1" shouldBe emptyJsonObject
       }
     }
 
-    "applying empty JSON on an existing key " should {
+    "applying empty optional fields to an existing fully populated form" should {
 
-      "unset the JSON contents of the key and verify the records data attibute contains no keys" in new TestSetup {
+      "not set the optional fields" in new TestSetup {
 
         val repository = repo("unsetJSValue")
         val id: Id = "testClearJsValueIdA"
@@ -286,15 +289,27 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         original.atomicId.get shouldBe a [BSONObjectID]
         original.data.get \ "form1" shouldBe sampleFormData1Json
 
-        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
-        updateCheck.updateType shouldBe a [Updated[_]]
+        // Verify optional fields can be removed.
+        val attributeRemoval = await(repository.createOrUpdate(id, "form1", sampleFormData1Json2))
+        attributeRemoval.updateType shouldBe a [Updated[_]]
 
+        val checkAttributeRemoval = await(repository.findById(id)).get
+        checkAttributeRemoval.atomicId.get shouldBe a [BSONObjectID]
+        checkAttributeRemoval.data.get \ "form1" shouldBe sampleFormData1Json2
+
+        // Verify complete object can be emptied.
+        val updateRemoval = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
+
+        updateRemoval.updateType shouldBe a [Updated[_]]
         val updated = await(repository.findById(id)).get
         updated.atomicId.get shouldBe a [BSONObjectID]
 
-        updated.data.get shouldBe emptyJsonObject
+        updated.data.get \ "form1" shouldBe emptyJsonObject
       }
 
+    }
+
+    "applying empty JSON on an existing key " should {
 
       "only unset the JSON contents of the key that was supplied with empty json object and leave the other key untouched" in new TestSetup {
 
@@ -323,35 +338,6 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
     }
 
-
-    "delta update " should {
-      "demonstrate how clients (i.e. front-end apps) can incorporate delta updates for free" in new TestSetup {
-
-        val repository = repo("updateDataByKey")
-
-        val id: Id = "updateMeId"
-
-        await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
-        val original = await(repository.findById(id)).get
-
-        await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
-        val updated = await(repository.findById(id)).get
-
-        updated.id shouldBe original.id
-        updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
-        updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
-
-        updated.data.get \ "form1" shouldBe sampleFormData1Json
-        updated.data.get \ "form2" shouldBe sampleFormData2Json
-
-        // Apply the delta change!
-        await(repository.createOrUpdate(id, "form2", sampleFormData2JsonDeltaOnlyUsername))
-
-        val updated2 = await(repository.findById(id)).get
-        updated2.data.get \ "form1" shouldBe sampleFormData1Json
-        updated2.data.get \ "form2" shouldBe sampleFormData2JsonA
-      }
-    }
   }
 
   "KeyStoreMongoRepository" should {
@@ -393,7 +379,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
     val emptyJsonObject = Json.parse("{}")
 
-    lazy val sampleFormData1Json: JsValue = Json.parse( """{
+    lazy val sampleFormData1Json = Json.parse( """{
                                                  |"form-field-username":"John Densemore",
                                                  |"form-field-password":"password1",
                                                  |"form-field-address-number":42,
@@ -405,6 +391,18 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
                                                  |  }
                                                  | }
                                                  |}""".stripMargin)
+
+    lazy val sampleFormData1Json2 = Json.parse( """{
+                                                    |"form-field-username":"John Densemore",
+                                                    |"form-field-password":"password1",
+                                                    |"inner1" : {
+                                                    |  "a" : "inner data depth 1",
+                                                    |  "inner2" : {
+                                                    |    "b" : "inner data depth 2"
+                                                    |  }
+                                                    | }
+                                                    |}""".stripMargin)
+
 
     lazy val sampleFormData2Json = Json.parse( """{
                                                  |"form-field-username":"Mark Dearnely",

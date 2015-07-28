@@ -57,58 +57,19 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
     "$setOnInsert" -> BSONDocument("modifiedDetails.createdAt" -> BSONDateTime(time))
   )
 
-  private def allKeys(json: JsValue): Seq[String] = json match {
-    case JsObject(fields) => fields.map(_._1)
-    case JsArray(as) => as.flatMap(allKeys)
-    case _ => Seq.empty[String]
-  }
-
-  private def buildKey(a:String, b:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a.$b"
-  private def buildKey(a:String) = s"${Cache.DATA_ATTRIBUTE_NAME}.$a"
-  private def unset(key:String) = BSONDocument("$unset" -> BSONDocument(buildKey(key) -> ""))
-
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
     withCurrentTime {
 
       implicit time =>
 
-        // Build the BSON update command based on the type of the JsValue.
-        val toCacheUpdateDocument = toCache match {
-
-          case stringValue:JsString =>
-            List(set(BSONDocument(buildKey(key) -> BSONString(stringValue.value))))
-
-          case intValue:JsNumber =>
-            List(set(BSONDocument(buildKey(key) -> BSONDouble(intValue.value.toDouble))))
-
-          case booleanValue:JsBoolean =>
-            List(set(BSONDocument(buildKey(key) -> BSONBoolean(booleanValue.value))))
-
-          case arrayValue:JsArray =>
-            List(set(BSONDocument(buildKey(key) -> BSONArray(arrayValue.value.map { value =>
-              BSONFormats.toBSON(value) match {
-                case JsSuccess(bson, _) => bson
-                case JsError(err) => throw new RuntimeException(s"Failed to convert JSArray for key $key! Error ${err.toString}")
-              }
-            }))))
-
-          case jsObject:JsObject =>
-            val update = for {
-              k <- allKeys(jsObject)
-            } yield (set(BSONDocument (buildKey (key, k) -> BSONFormats.toBSON (toCache \ k).get) ) )
-            if (update.isEmpty) Seq (unset(key) ) else update
-
-          // JSNUll is not covered!
-          case _ => throw new IllegalArgumentException("The JsValue is not recognized!")
-        }
-
-        // Generate a single BSON update operation to be applied to mongo for the collection.
-        val modifier = List(
+        val modifiers = List(
+          // Set the document and overwrite if already exists.
+          set(BSONDocument(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> BSONFormats.toBSON(toCache).getOrElse(throw new IllegalArgumentException("Failed to build insert command!")))),
           modifierForCrudCredentialsBSON(time.getMillis),
           setOnInsert(BSONDocument(Id -> BSONString(id.id)))
-        )
-        val modifiers=(toCacheUpdateDocument.toList ::: modifier).reduceLeft(_ ++ _)
+        ).reduceLeft(_ ++ _)
+
         atomicSaveOrUpdate(findByIdBSON(id.id), modifiers, upsert = true, AtomicId).map(_.getOrElse(throw atomicError))
     }
   }
