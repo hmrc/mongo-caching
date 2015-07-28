@@ -12,6 +12,7 @@ object HmrcBuild extends Build {
   lazy val mongoCache = Project(appName, file("."))
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
+      targetJvm := "jvm-1.7",
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
