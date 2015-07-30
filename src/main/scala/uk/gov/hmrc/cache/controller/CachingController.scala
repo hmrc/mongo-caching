@@ -17,8 +17,9 @@
  package uk.gov.hmrc.cache.controller
 
 import play.api.libs.json._
-import play.api.mvc.{Controller, Result, Request}
+import play.api.mvc.{Controller, Request, Result}
 import play.modules.reactivemongo.MongoDbConnection
+import reactivemongo.api.commands._
 import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
 
@@ -65,7 +66,7 @@ import scala.concurrent.Future
     }
   }
 
-  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id).map {
+  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id, WriteConcern.Default).map {
     case lastError if lastError.ok => NoContent
   }.recover {
     case t  => InternalServerError(s"Failed to remove entity '$id' from source '$source'. Error: ${t.getMessage}")

@@ -25,6 +25,7 @@ import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
 
 import scala.concurrent.{ExecutionContext, Future}
+ import ExecutionContext.Implicits.global
 
 
 trait CacheRepository extends Repository[Cache, Id] {

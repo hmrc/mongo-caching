@@ -13,12 +13,13 @@ object HmrcBuild extends Build {
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
       targetJvm := "jvm-1.7",
+      scalaVersion := "2.11.7",
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
         Resolver.bintrayRepo("hmrc", "releases")
       ),
-      crossScalaVersions := Seq("2.11.6"),
+      crossScalaVersions := Seq("2.11.7"),
       ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) }
     )
 }
@@ -27,8 +28,8 @@ private object AppDependencies {
 
   import play.core.PlayVersion
 
-  private val playReactivemongoVersion = "3.4.1"
-  private val simpleReactivemongoVersion = "2.7.0"
+  private val playReactivemongoVersion = "4.0.0"
+  private val simpleReactivemongoVersion = "3.0.1"
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
@@ -48,11 +49,10 @@ private object AppDependencies {
   object Test {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
+        "uk.gov.hmrc" %% "reactivemongo-test" % "0.2.0" % scope,
         "org.scalatest" %% "scalatest" % "2.2.4" % scope,
         "com.typesafe.play" %% "play-test" % PlayVersion.current % scope,
-        "org.pegdown" % "pegdown" % "1.4.2" % scope,
-
-        "uk.gov.hmrc" %% "simple-reactivemongo" % simpleReactivemongoVersion % scope
+        "org.pegdown" % "pegdown" % "1.4.2" % scope
       )
     }.test
   }

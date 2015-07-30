@@ -82,7 +82,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         original.id shouldBe id
         original.data.get \ "form1" shouldBe sampleFormData1Json
 
-        repository.removeById(id)
+        await(repository.removeById(id))
         val removed = await(repository.findById(id))
         removed should be(empty)
       }
@@ -240,7 +240,8 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val repository = repo("updateLegacy")
         val id: Id = "updateLegacyId"
 
-        await(repository.save(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))))
+        val res = await(repository.insert(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))))
+
         val original = await(repository.findById(id)).get
         original.atomicId shouldBe None
 
@@ -256,6 +257,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updated.data.get \ "form1" shouldBe sampleFormData1Json
         updated.data.get \ "form2" shouldBe sampleFormData2Json
       }
+
     }
 
     "inserting a new key which contains an empty JsValue " should {
