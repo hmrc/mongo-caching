@@ -24,16 +24,13 @@ object HmrcBuild extends Build {
     )
 }
 
-private object AppDependencies {
+private object AppDependencies {emove
 
   import play.core.PlayVersion
 
-  private val playReactivemongoVersion = "4.0.2"
-  private val reactivemongoTestVersion = "1.0.1"
-
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
-    "uk.gov.hmrc" %% "play-reactivemongo" % playReactivemongoVersion,
+    "uk.gov.hmrc" %% "play-reactivemongo" % "4.0.2",
 
     "uk.gov.hmrc" %% "time" % "1.4.0",
     "uk.gov.hmrc" %% "http-exceptions" % "0.4.0"
@@ -47,7 +44,7 @@ private object AppDependencies {
   object Test {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
-        "uk.gov.hmrc" %% "reactivemongo-test" % reactivemongoTestVersion % scope,
+        "uk.gov.hmrc" %% "reactivemongo-test" % "1.0.1" % scope,
         "org.scalatest" %% "scalatest" % "2.2.4" % scope,
         "com.typesafe.play" %% "play-test" % PlayVersion.current % scope,
         "org.pegdown" % "pegdown" % "1.4.2" % scope
