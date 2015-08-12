@@ -24,7 +24,7 @@ object HmrcBuild extends Build {
     )
 }
 
-private object AppDependencies {emove
+private object AppDependencies {
 
   import play.core.PlayVersion
 
