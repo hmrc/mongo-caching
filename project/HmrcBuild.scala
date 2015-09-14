@@ -12,7 +12,6 @@ object HmrcBuild extends Build {
   lazy val mongoCache = Project(appName, file("."))
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
-      targetJvm := "jvm-1.7",
       scalaVersion := "2.11.7",
       libraryDependencies ++= AppDependencies(),
       resolvers := Seq(
@@ -30,10 +29,10 @@ private object AppDependencies {
 
   val compile = Seq(
     "com.typesafe.play" %% "play" % PlayVersion.current % "provided",
-    "uk.gov.hmrc" %% "play-reactivemongo" % "4.0.2",
+    "uk.gov.hmrc" %% "play-reactivemongo" % "4.2.0",
 
-    "uk.gov.hmrc" %% "time" % "1.4.0",
-    "uk.gov.hmrc" %% "http-exceptions" % "0.4.0"
+    "uk.gov.hmrc" %% "time" % "2.0.0",
+    "uk.gov.hmrc" %% "http-exceptions" % "1.0.0"
   )
 
   trait TestDependencies {
@@ -44,7 +43,7 @@ private object AppDependencies {
   object Test {
     def apply() = new TestDependencies {
       override lazy val test = Seq(
-        "uk.gov.hmrc" %% "reactivemongo-test" % "1.0.1" % scope,
+        "uk.gov.hmrc" %% "reactivemongo-test" % "1.1.0" % scope,
         "org.scalatest" %% "scalatest" % "2.2.4" % scope,
         "com.typesafe.play" %% "play-test" % PlayVersion.current % scope,
         "org.pegdown" % "pegdown" % "1.4.2" % scope
