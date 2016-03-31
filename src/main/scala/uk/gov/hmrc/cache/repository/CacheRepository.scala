@@ -71,11 +71,9 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
           setOnInsert(BSONDocument(Id -> BSONString(id.id)))
         ).reduceLeft(_ ++ _)
 
-        atomicSaveOrUpdate(findByIdBSON(id.id), modifiers, upsert = true, AtomicId).map(_.getOrElse(throw atomicError))
+        atomicUpsert(findByIdBSON(id.id), modifiers, AtomicId)
     }
   }
-
-  private def atomicError = new EntityNotFoundException(s"Failed to receive updated object from atomics!")
 
   override def isInsertion(newRecordId: BSONObjectID, oldRecord: Cache) = {
     oldRecord.atomicId match {
