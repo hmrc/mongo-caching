@@ -28,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
  import ExecutionContext.Implicits.global
 
 
-trait CacheRepository extends Repository[Cache, Id] {
+trait CacheRepository extends Repository[Cache, Id] with UniqueIndexViolationRecovery {
 
   def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = ???
 
@@ -71,7 +71,9 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
           setOnInsert(BSONDocument(Id -> BSONString(id.id)))
         ).reduceLeft(_ ++ _)
 
-        atomicUpsert(findByIdBSON(id.id), modifiers, AtomicId)
+        def upsert = atomicUpsert(findByIdBSON(id.id), modifiers, AtomicId)
+
+        recoverFromViolation(upsert, upsert)
     }
   }
 
