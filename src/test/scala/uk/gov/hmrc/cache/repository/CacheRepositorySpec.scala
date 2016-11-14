@@ -106,6 +106,19 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updateCheck.data.get \ "form1" shouldBe emptyJsonObject
       }
 
+      "handle parallel processing - race condition" in new TestSetup {
+        val repository = repo("simpledata")
+        val id: Id = "numberId"
+        val jsonNumber = Json.toJson(123)
+
+        (0 to 100).par.foreach(_ => await(repository.createOrUpdate(id, "form1", jsonNumber)))
+
+        val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        unsetCheck.updateType shouldBe a[Updated[_]]
+        val updateCheck = await(repository.findById(id)).get
+        updateCheck.data.get \ "form1" shouldBe emptyJsonObject
+      }
+
       "write and read JsValue type JsNumber Double" in new TestSetup {
         val repository = repo("simpledata")
         val id: Id = "numberDoubleId"
