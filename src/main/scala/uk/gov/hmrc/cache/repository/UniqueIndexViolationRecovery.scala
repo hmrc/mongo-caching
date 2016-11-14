@@ -16,16 +16,19 @@
 
 package uk.gov.hmrc.cache.repository
 
-import scala.concurrent.Future
-import reactivemongo.core.errors.DatabaseException
+import reactivemongo.bson.BSONInteger
+import reactivemongo.core.commands.BSONCommandError
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 trait UniqueIndexViolationRecovery {
   
   def recoverFromViolation[A](result: Future[A], fallback: => Future[A]) =
-    result recoverWith { 
-      case result: DatabaseException if result.code == Some(11000) => fallback
+    result recoverWith {
+      case e: BSONCommandError if e.originalDocument.isDefined
+          && e.originalDocument.get.get("code") == Some(BSONInteger(11000)) =>
+        fallback
     }
     
 }
