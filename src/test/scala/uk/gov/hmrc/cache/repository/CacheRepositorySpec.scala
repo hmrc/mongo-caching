@@ -111,7 +111,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val id: Id = "numberId"
         val jsonNumber = Json.toJson(123)
 
-        (0 to 10).par.foreach(_ => await(repository.createOrUpdate(id, "form1", jsonNumber)))
+        (0 to 100).par.foreach(_ => await(repository.createOrUpdate(id, "form1", jsonNumber)))
 
         val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
         unsetCheck.updateType shouldBe a[Updated[_]]
