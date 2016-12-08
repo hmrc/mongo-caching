@@ -65,7 +65,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         Option(original.modifiedDetails.createdAt) shouldBe defined
         Option(original.modifiedDetails.lastUpdated) shouldBe defined
         Option(original.atomicId.get) shouldBe defined
-        original.data.get \ "form1" shouldBe sampleFormData1Json
+        (original.data.get \ "form1").get shouldBe sampleFormData1Json
       }
     }
 
@@ -80,7 +80,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val original = await(repository.findById(id)).get
         original.id shouldBe id
-        original.data.get \ "form1" shouldBe sampleFormData1Json
+        (original.data.get \ "form1").get shouldBe sampleFormData1Json
 
         await(repository.removeById(id))
         val removed = await(repository.findById(id))
@@ -98,12 +98,12 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonNumber))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonNumber
+        (original.data.get \ "form1").get shouldBe jsonNumber
 
         val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
         unsetCheck.updateType shouldBe a[Updated[_]]
         val updateCheck = await(repository.findById(id)).get
-        updateCheck.data.get \ "form1" shouldBe emptyJsonObject
+        (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
       }
 
       "handle parallel processing - race condition" in new TestSetup {
@@ -116,7 +116,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
         unsetCheck.updateType shouldBe a[Updated[_]]
         val updateCheck = await(repository.findById(id)).get
-        updateCheck.data.get \ "form1" shouldBe emptyJsonObject
+        (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
       }
 
       "write and read JsValue type JsNumber Double" in new TestSetup {
@@ -128,7 +128,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
 
-        original.data.get \ "form1" shouldBe jsonNumber
+        (original.data.get \ "form1").get shouldBe jsonNumber
       }
 
       "write and read JsValue type JsString" in new TestSetup {
@@ -139,7 +139,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonString))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonString
+        (original.data.get \ "form1").get shouldBe jsonString
       }
 
       "write and read JsValue type JsBoolean" in new TestSetup {
@@ -150,7 +150,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonBoolean))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonBoolean
+        (original.data.get \ "form1").get shouldBe jsonBoolean
       }
 
       "write and read JsValue type JsArray Integer" in new TestSetup {
@@ -161,7 +161,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original: Cache = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonArray
+        (original.data.get \ "form1").get shouldBe jsonArray
       }
 
       "write and read JsValue type JsArray String" in new TestSetup {
@@ -172,7 +172,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonArray
+        (original.data.get \ "form1").get shouldBe jsonArray
       }
 
       "write and read JsValue type JsArray Double" in new TestSetup {
@@ -183,7 +183,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonArray
+        (original.data.get \ "form1").get shouldBe jsonArray
       }
 
       "write and read a JsValue type JsArray user-defined" in new TestSetup {
@@ -200,7 +200,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
         insertCheck.updateType shouldBe a[Saved[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "form1" shouldBe jsonArray
+        (original.data.get \ "form1").get shouldBe jsonArray
       }
 
       "Saving a key with empty json will create a mongo record with no data attribute, " +
@@ -211,12 +211,12 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         await(repository.createOrUpdate(id, "searched-person", Json.parse("{}")))
         val shouldHaveNoData = await(repository.findById(id)).get
-        shouldHaveNoData.data.get  \ "searched-person"  shouldBe Json.parse("{}")
+        (shouldHaveNoData.data.get  \ "searched-person").get  shouldBe Json.parse("{}")
 
         val insertCheck = await(repository.createOrUpdate(id, "searched-person", sampleFormData1Json))
         insertCheck.updateType shouldBe a[Updated[_]]
         val original = await(repository.findById(id)).get
-        original.data.get \ "searched-person" shouldBe sampleFormData1Json
+        (original.data.get \ "searched-person").get shouldBe sampleFormData1Json
       }
 
       "once a record has been created, allow new records associated with the same key to be created and updated within a single operation" in new TestSetup {
@@ -236,13 +236,13 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
 
-        updated.data.get \ "form1" shouldBe sampleFormData1Json
-        updated.data.get \ "form2" shouldBe sampleFormData2Json
+        (updated.data.get \ "form1").get shouldBe sampleFormData1Json
+        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
 
         await(repository.createOrUpdate(id, "form2", sampleFormData2JsonA))
         val updated2 = await(repository.findById(id)).get
-        updated2.data.get \ "form1" shouldBe sampleFormData1Json
-        updated2.data.get \ "form2" shouldBe sampleFormData2JsonA
+        (updated2.data.get \ "form1").get shouldBe sampleFormData1Json
+        (updated2.data.get \ "form2").get shouldBe sampleFormData2JsonA
       }
     }
 
@@ -267,8 +267,8 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         updated.id shouldBe original.id
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
 
-        updated.data.get \ "form1" shouldBe sampleFormData1Json
-        updated.data.get \ "form2" shouldBe sampleFormData2Json
+        (updated.data.get \ "form1").get shouldBe sampleFormData1Json
+        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
       }
 
     }
@@ -286,7 +286,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
 
-        original.data.get \ "form1" shouldBe emptyJsonObject
+        (original.data.get \ "form1").get shouldBe emptyJsonObject
       }
     }
 
@@ -302,7 +302,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
-        original.data.get \ "form1" shouldBe sampleFormData1Json
+        (original.data.get \ "form1").get shouldBe sampleFormData1Json
 
         // Verify optional fields can be removed.
         val attributeRemoval = await(repository.createOrUpdate(id, "form1", sampleFormData1Json2))
@@ -310,7 +310,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val checkAttributeRemoval = await(repository.findById(id)).get
         checkAttributeRemoval.atomicId.get shouldBe a [BSONObjectID]
-        checkAttributeRemoval.data.get \ "form1" shouldBe sampleFormData1Json2
+        (checkAttributeRemoval.data.get \ "form1").get shouldBe sampleFormData1Json2
 
         // Verify complete object can be emptied.
         val updateRemoval = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
@@ -319,7 +319,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val updated = await(repository.findById(id)).get
         updated.atomicId.get shouldBe a [BSONObjectID]
 
-        updated.data.get \ "form1" shouldBe emptyJsonObject
+        (updated.data.get \ "form1").get shouldBe emptyJsonObject
       }
 
     }
@@ -339,8 +339,8 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
         val original = await(repository.findById(id)).get
         original.atomicId.get shouldBe a [BSONObjectID]
-        original.data.get \ "form1" shouldBe sampleFormData1Json
-        original.data.get \ "form2" shouldBe sampleFormData2Json
+        (original.data.get \ "form1").get shouldBe sampleFormData1Json
+        (original.data.get \ "form2").get shouldBe sampleFormData2Json
 
         val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
         updateCheck.updateType shouldBe a [Updated[_]]
@@ -348,8 +348,8 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         val updated = await(repository.findById(id)).get
         updated.atomicId.get shouldBe a [BSONObjectID]
 
-        (updated.data.get \ "form1").asOpt[String] shouldBe None
-        updated.data.get \ "form2" shouldBe sampleFormData2Json
+        (updated.data.get \ "form1").get.asOpt[String] shouldBe None
+        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
       }
     }
 
