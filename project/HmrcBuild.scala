@@ -34,7 +34,7 @@ private object AppDependencies {
     "uk.gov.hmrc" %% "play-reactivemongo" % "5.2.0",
 
     "uk.gov.hmrc" %% "time" % "3.0.0",
-    "uk.gov.hmrc" %% "http-exceptions" % "1.0.0"
+    "uk.gov.hmrc" %% "http-core" % "0.6.0"
   )
 
   trait TestDependencies {

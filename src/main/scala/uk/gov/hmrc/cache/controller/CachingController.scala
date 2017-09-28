@@ -31,7 +31,7 @@ import scala.concurrent.Future
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
   import uk.gov.hmrc.cache.repository.CacheRepository
-  import uk.gov.hmrc.play.http.BadRequestException
+  import uk.gov.hmrc.http.BadRequestException
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
