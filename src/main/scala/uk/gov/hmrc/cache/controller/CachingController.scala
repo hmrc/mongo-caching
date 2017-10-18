@@ -57,12 +57,15 @@ import scala.concurrent.Future
   }
 
   def add(source: String, id: String, key: String)(extractBody: ((JsValue) => Future[Result]) => Future[Result])(implicit request: Request[JsValue]): Future[Result] = {
-    if (key contains '.') BadRequest("A cacheable key cannot contain dots")
-    extractBody { jsBody =>
+    if (key contains '.') {
+      Future.successful(BadRequest("A cacheable key cannot contain dots"))
+    } else {
+      extractBody { jsBody =>
 
-      keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => {
-        Ok(toJson(safeConversion(result.updateType.savedValue)))
-      })
+        keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => {
+          Ok(toJson(safeConversion(result.updateType.savedValue)))
+        })
+      }
     }
   }
 
