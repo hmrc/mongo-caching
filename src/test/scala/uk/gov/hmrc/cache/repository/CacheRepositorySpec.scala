@@ -42,7 +42,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   }
 
   override protected def beforeEach() = {
-    mongoConnectorForTest.db().drop
+    await(mongoConnectorForTest.db().drop)
   }
 
   "create or update" should {
