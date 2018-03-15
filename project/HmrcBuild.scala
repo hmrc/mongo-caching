@@ -11,14 +11,12 @@ object HmrcBuild extends Build {
   import uk.gov.hmrc.SbtAutoBuildPlugin
 
   val appName = "mongo-caching"
-  val appVersion = envOrElse("MONGO_CACHING_VERSION", "999-SNAPSHOT")
 
   lazy val mongoCache = Project(appName, file("."))
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning)
     .settings(
       scalaVersion := "2.11.7",
       libraryDependencies ++= AppDependencies(),
-      shellPrompt := ShellPrompt(appVersion),
       evictionWarningOptions in update := EvictionWarningOptions.default.withWarnScalaVersionEviction(false),
       resolvers := Seq(
         "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
@@ -28,7 +26,6 @@ object HmrcBuild extends Build {
       crossScalaVersions := Seq("2.11.7"),
       ivyScala := ivyScala.value map { _.copy(overrideScalaVersion = true) }
     )
-    .settings(version := appVersion)
 }
 
 private object AppDependencies {
