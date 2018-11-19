@@ -16,15 +16,29 @@
 
  package uk.gov.hmrc.cache
 
-import play.api.Play
+import play.api.{Configuration, Play}
+
+import scala.concurrent.duration._
+
+
 
 trait TimeToLive {
 
   import scala.concurrent.duration.{MINUTES, Duration}
 
-  private val fiveMinutes = 5L
+  private val fiveMinutes = (5 minutes).toMillis
 
+  protected val cacheExpiryInMinutesKey = "cache.expiryInMinutes"
+
+  def configuration:Configuration
+
+  @deprecated("replaced by {@link #defaultTTL}")
   lazy val defaultExpireAfter: Long = Duration(
-    Play.current.configuration.getMilliseconds("cache.expiryInMinutes").getOrElse(fiveMinutes), MINUTES
-  ).toSeconds
+    Play.current.configuration.getMilliseconds(cacheExpiryInMinutesKey).getOrElse(fiveMinutes), MINUTES).toSeconds
+
+  val defaultTTL: Long =
+    configuration.getOptional[Duration](cacheExpiryInMinutesKey).map(_.toMillis).getOrElse(fiveMinutes)
+
 }
+
+

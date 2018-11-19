@@ -17,8 +17,7 @@
 package uk.gov.hmrc.cache.repository
 
 import play.api.libs.json._
-import play.modules.reactivemongo.MongoDbConnection
-import reactivemongo.api.DB
+import play.modules.reactivemongo.{MongoDbConnection, ReactiveMongoComponent}
 import reactivemongo.bson._
 import reactivemongo.play.json.BSONFormats
 import uk.gov.hmrc.cache.model.{Cache, Id}
@@ -27,7 +26,7 @@ import uk.gov.hmrc.mongo._
 import scala.concurrent.{ExecutionContext, Future}
 
 
-trait CacheRepository extends Repository[Cache, Id] with UniqueIndexViolationRecovery {
+trait CacheRepository extends ReactiveRepository[Cache, Id] with UniqueIndexViolationRecovery {
 
   def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = ???
 
@@ -36,11 +35,18 @@ trait CacheRepository extends Repository[Cache, Id] with UniqueIndexViolationRec
 
 object CacheRepository extends MongoDbConnection {
 
-  def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository = new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
+  def apply(collectionNameProvidedBySource: String,
+            expireAfterSeconds: Long,
+            reactiveMongoComponent: ReactiveMongoComponent,
+            cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository =
+    new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, reactiveMongoComponent, cacheFormats)
 }
 
-class CacheMongoRepository(collName: String, override val expireAfterSeconds: Long, cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
-  extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
+class CacheMongoRepository(collName: String,
+                           override val expireAfterSeconds: Long,
+                           reactiveMongoComponent: ReactiveMongoComponent,
+                           cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit ec: ExecutionContext)
+  extends ReactiveRepository[Cache, Id](collName, reactiveMongoComponent.mongoConnector.db, cacheFormats, Id.idFormats)
     with CacheRepository with TTLIndexing[Cache]
     with AtomicUpdate[Cache]
     with BSONBuilderHelpers {

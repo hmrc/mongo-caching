@@ -20,15 +20,17 @@ import play.api.libs.json._
  import reactivemongo.bson.BSONObjectID
  import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
 
- case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(), atomicId:Option[BSONObjectID]=None) extends Cacheable {
-}
+case class Cache(id: Id,
+                 data: Option[JsValue] = None,
+                 modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(),
+                 atomicId: Option[BSONObjectID] = None) extends Cacheable
 
 object Cache {
   import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 
-  final val DATA_ATTRIBUTE_NAME="data"
+  final val DATA_ATTRIBUTE_NAME = "data"
 
-  implicit val format = ReactiveMongoFormats.objectIdFormats
+  implicit val format      = ReactiveMongoFormats.objectIdFormats
   implicit val cacheFormat = Json.format[Cache]
 
   val mongoFormats = ReactiveMongoFormats.mongoEntity {

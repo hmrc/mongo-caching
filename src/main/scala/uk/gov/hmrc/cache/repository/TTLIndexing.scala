@@ -19,7 +19,7 @@ package uk.gov.hmrc.cache.repository
 import play.api.Logger
 import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.{BSONInteger, BSONDocument, BSONLong, BSONString}
-import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command, Status}
+import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command}
 import uk.gov.hmrc.cache.model.Id
 import uk.gov.hmrc.mongo.ReactiveRepository
 
@@ -48,7 +48,7 @@ trait TTLIndexing[A] {
 
         if (idxToUpdate.isDefined) {
           for {
-            deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
+            _       <- collection.indexesManager.drop(idxToUpdate.get.eventualName)
             updated <- ensureLastUpdated
           } yield updated
         }
@@ -56,12 +56,13 @@ trait TTLIndexing[A] {
           ensureLastUpdated
         }
       }
+
     }
     Logger.info(s"Creating time to live for entries in ${collection.name} to $expireAfterSeconds seconds")
     ensureLastUpdated
   }
 
-  private def ensureLastUpdated = {
+  private def ensureLastUpdated: Future[Seq[Boolean]] = {
     Future.sequence(Seq(collection.indexesManager.ensure(
       Index(
         key = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),

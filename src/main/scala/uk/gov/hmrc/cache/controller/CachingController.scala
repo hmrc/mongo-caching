@@ -16,33 +16,40 @@
 
  package uk.gov.hmrc.cache.controller
 
+import javax.inject.{Inject, Singleton}
+import play.api.Configuration
 import play.api.libs.json._
 import play.api.mvc.{Controller, Request, Result}
-import play.modules.reactivemongo.MongoDbConnection
+import play.modules.reactivemongo.{MongoDbConnection, ReactiveMongoComponent}
 import reactivemongo.api.commands._
 import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
+import play.api.mvc.Results._
 
 import scala.concurrent.Future
 
- trait CachingController extends MongoDbConnection with TimeToLive {
-  self: Controller =>
+@Singleton
+class CachingController @Inject() (reactiveMongoComponent: ReactiveMongoComponent, conf: Configuration) extends TimeToLive {
 
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
   import uk.gov.hmrc.cache.repository.CacheRepository
-  import uk.gov.hmrc.http.BadRequestException
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   lazy val cacheMongoFormats: Format[Cache] = Cache.mongoFormats
 
-  private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, cacheMongoFormats)
+  override def configuration: Configuration = conf
 
-  def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id).map {
-    case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))
-    case _ => NotFound("No entity found")
-  }
+
+  private def keyStoreRepository(source: String) =
+    CacheRepository(source, defaultExpireAfter, reactiveMongoComponent, cacheMongoFormats)
+
+  def find[A](source: String, id: String)(implicit w: Writes[A]) =
+    keyStoreRepository(source).findById(id).map {
+      case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))
+      case _ => NotFound("No entity found")
+    }
 
   def dataKeys(source: String, id: String) = keyStoreRepository(source).findById(id).map {
     case Some(ks) => Ok(toJson(ks.dataKeys()))
@@ -56,7 +63,9 @@ import scala.concurrent.Future
     }
   }
 
-  def add(source: String, id: String, key: String)(extractBody: ((JsValue) => Future[Result]) => Future[Result])(implicit request: Request[JsValue]): Future[Result] = {
+  def add(source: String,
+          id: String,
+          key: String)(extractBody: (JsValue => Future[Result]) => Future[Result])(implicit request: Request[JsValue]): Future[Result] = {
     if (key contains '.') {
       Future.successful(BadRequest("A cacheable key cannot contain dots"))
     } else {
@@ -74,4 +83,5 @@ import scala.concurrent.Future
   }.recover {
     case t  => InternalServerError(s"Failed to remove entity '$id' from source '$source'. Error: ${t.getMessage}")
   }
+
 }

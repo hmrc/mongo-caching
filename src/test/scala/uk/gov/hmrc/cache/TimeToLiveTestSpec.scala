@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 HM Revenue & Customs
+ * Copyright 2018 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,34 +18,43 @@ package uk.gov.hmrc.cache
 
 import org.scalatest.Matchers._
 import org.scalatest.WordSpecLike
-import play.api.test.FakeApplication
+import play.api.Configuration
+import play.api.inject.guice.GuiceApplicationBuilder
+//import play.api.test.FakeApplication
 import play.api.test.Helpers._
 
 class TimeToLiveTestSpec extends WordSpecLike {
 
+  val conf = Configuration("cache.expiryInMinutes" -> "6")
   "TimeToLive" should {
-    val conf = Map("cache.expiryInMinutes" -> "6")
-    val fakeApp = FakeApplication(additionalConfiguration = conf)
+
+    val fakeApp = new GuiceApplicationBuilder().configure(conf).build()
 
     "yield the default value when there is no config to read " in {
-      running(FakeApplication()) {
-        val ttl = new TimeToLive {}
+      running(new GuiceApplicationBuilder().build()) {
+        val ttl = buildTtl(conf)
         ttl.defaultExpireAfter should be(300)
       }
     }
 
     "read the 'cache.expiryInMinutes' config value " in {
       running(fakeApp) {
-        val ttl = new TimeToLive {}
+        val ttl = buildTtl(conf)
         ttl.defaultExpireAfter should be(360)
       }
     }
 
     "yield the default value when 'cache.expiryInMinutes' config is missing" in {
-      running(FakeApplication()) {
-        val ttl = new TimeToLive {}
+      running(new GuiceApplicationBuilder().build()) {
+        val ttl = buildTtl(conf)
         ttl.defaultExpireAfter should be(300)
       }
+    }
+  }
+
+  private def buildTtl(config: Configuration) = {
+    new TimeToLive {
+      override def configuration = config
     }
   }
 }
