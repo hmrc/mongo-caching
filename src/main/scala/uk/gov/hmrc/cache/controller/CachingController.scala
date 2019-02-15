@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 HM Revenue & Customs
+ * Copyright 2019 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.commands._
 import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
-
 import scala.concurrent.Future
 
  trait CachingController extends MongoDbConnection with TimeToLive {
@@ -31,8 +30,6 @@ import scala.concurrent.Future
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
   import uk.gov.hmrc.cache.repository.CacheRepository
-  import uk.gov.hmrc.http.BadRequestException
-
   import scala.concurrent.ExecutionContext.Implicits.global
 
   lazy val cacheMongoFormats: Format[Cache] = Cache.mongoFormats
