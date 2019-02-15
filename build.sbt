@@ -6,9 +6,9 @@ val libName = "mongo-caching"
 
 val compileDependencies = Seq(
   "com.typesafe.play" %% "play"               % PlayVersion.current % "provided",
-  "uk.gov.hmrc"       %% "play-reactivemongo" % "6.2.0",
+  "uk.gov.hmrc"       %% "play-reactivemongo" % "6.4.0",
   "uk.gov.hmrc"       %% "time"               % "3.0.0",
-  "uk.gov.hmrc"       %% "http-verbs"         % "8.10.0-play-25"
+  "uk.gov.hmrc"       %% "http-verbs"         % "9.1.0-play-25"
 )
 
 val testDependencies = Seq(
