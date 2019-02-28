@@ -19,7 +19,7 @@ package uk.gov.hmrc.cache.repository
 import play.api.Logger
 import reactivemongo.api.indexes.{Index, IndexType}
 import reactivemongo.bson.{BSONInteger, BSONDocument, BSONLong, BSONString}
-import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command, Status}
+import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command}
 import uk.gov.hmrc.cache.model.Id
 import uk.gov.hmrc.mongo.ReactiveRepository
 
@@ -41,19 +41,12 @@ trait TTLIndexing[A] {
     val indexes = collection.indexesManager.list()
     indexes.flatMap {
       idxs => {
-
         val idxToUpdate = idxs.find(index =>
           index.eventualName == LastUpdatedIndex
             && index.options.getAs[BSONLong](OptExpireAfterSeconds).getOrElse(BSONLong(expireAfterSeconds)).as[Long] != expireAfterSeconds)
 
-        if (idxToUpdate.isDefined) {
-          for {
-            deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
-            updated <- ensureLastUpdated
-          } yield updated
-        }
-        else {
-          ensureLastUpdated
+        idxToUpdate.fold(ensureLastUpdated){ index =>
+          collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
         }
       }
     }

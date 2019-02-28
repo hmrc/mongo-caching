@@ -27,7 +27,7 @@ import uk.gov.hmrc.mongo._
 import scala.concurrent.{ExecutionContext, Future}
 
 
-trait CacheRepository extends Repository[Cache, Id] with UniqueIndexViolationRecovery {
+trait CacheRepository extends ReactiveRepository[Cache, Id] with UniqueIndexViolationRecovery {
 
   def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = ???
 

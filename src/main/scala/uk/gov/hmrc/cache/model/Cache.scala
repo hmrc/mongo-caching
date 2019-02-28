@@ -20,7 +20,10 @@ import play.api.libs.json._
  import reactivemongo.bson.BSONObjectID
  import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
 
- case class Cache(id: Id, data: Option[JsValue] = None, modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(), atomicId:Option[BSONObjectID]=None) extends Cacheable {
+ case class Cache(id: Id,
+                  data: Option[JsValue] = None,
+                  modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(),
+                  atomicId:Option[BSONObjectID]=None) extends Cacheable {
 }
 
 object Cache {
