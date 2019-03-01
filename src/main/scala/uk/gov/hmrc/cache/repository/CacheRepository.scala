@@ -20,9 +20,11 @@ import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
 import reactivemongo.bson._
-import reactivemongo.play.json.BSONFormats
+import reactivemongo.core.commands.BSONCommandError
+import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
+import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -34,6 +36,7 @@ trait CacheRepository extends ReactiveRepository[Cache, Id] with UniqueIndexViol
   protected def saveOrUpdate(findQuery: => Future[Option[Cache]], ifNotFound: => Future[Cache], modifiers: (Cache) => Cache)(implicit ec: ExecutionContext): Future[DatabaseUpdate[Cache]] = ???
 }
 
+@deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
 object CacheRepository extends MongoDbConnection {
 
   def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository = new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
@@ -42,19 +45,13 @@ object CacheRepository extends MongoDbConnection {
 class CacheMongoRepository(collName: String, override val expireAfterSeconds: Long, cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
   extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
     with CacheRepository with TTLIndexing[Cache]
-    with AtomicUpdate[Cache]
     with BSONBuilderHelpers {
 
 
-  final val AtomicId="atomicId"
-  final val Id="_id"
+  final val AtomicId = "atomicId"
+  final val Id = "_id"
 
-  private def findByIdBSON(id: Id) = BSONDocument(Id -> BSONString(id.id))
-
-  private def modifierForCrudCredentialsBSON(time: Long): BSONDocument = BSONDocument(
-    "$set" -> BSONDocument("modifiedDetails.lastUpdated" -> BSONDateTime(time)),
-    "$setOnInsert" -> BSONDocument("modifiedDetails.createdAt" -> BSONDateTime(time))
-  )
+  import ReactiveMongoFormats._
 
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
@@ -62,24 +59,38 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
 
       implicit time =>
 
-        val modifiers = List(
-          // Set the document and overwrite if already exists.
-          set(BSONDocument(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> BSONFormats.toBSON(toCache).getOrElse(throw new IllegalArgumentException("Failed to build insert command!")))),
-          modifierForCrudCredentialsBSON(time.getMillis),
-          setOnInsert(BSONDocument(Id -> BSONString(id.id)))
-        ).reduceLeft(_ ++ _)
+        withCurrentTime { time =>
+          def upsert: Future[JSONFindAndModifyCommand.FindAndModifyResult] = findAndUpdate(
+            Json.obj(Id -> id.id),
+            Json.obj(
+              "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
+              "$setOnInsert" -> Json.obj("modifiedDetails.createdAt" -> time, Id -> id.id, AtomicId -> BSONObjectID.generate())
+            ),
+            upsert = true,
+            fetchNewObject = true
+          ).recoverWith {
+            case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
+          }
 
-        def upsert = atomicUpsert(findByIdBSON(id.id), modifiers, AtomicId)
+          def handleOutcome(outcome: JSONFindAndModifyCommand.FindAndModifyResult): Future[DatabaseUpdate[Cache]] = {
+            (outcome.lastError, outcome.result[Cache]) match {
+              case (Some(error), Some(value)) =>
+                println(value)
+                if (error.n > 0) {
+                  if (error.updatedExisting) {
+                    Future.successful(DatabaseUpdate(null, Updated(null, value)))
+                  } else {
+                    Future.successful(DatabaseUpdate(null, Saved(value)))
+                  }
+                } else {
+                  upsert flatMap handleOutcome
+                }
+              case _ => throw new EntityNotFoundException("Failed to receive updated object!")
+            }
+          }
 
-        recoverFromViolation(upsert, upsert)
+          upsert.flatMap(handleOutcome)
+        }
     }
   }
-
-  override def isInsertion(newRecordId: BSONObjectID, oldRecord: Cache) = {
-    oldRecord.atomicId match {
-      case Some(id) => newRecordId.equals(id)
-      case _        => false
-    }
-  }
-
 }
