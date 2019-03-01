@@ -43,7 +43,7 @@ val testDependencies = PlayCrossCompilation.dependencies(
 lazy val mongoCache = Project(libName, file("."))
     .enablePlugins(SbtAutoBuildPlugin, SbtGitVersioning, SbtArtifactory)
     .settings(
-      majorVersion := 5,
+      majorVersion := 6,
       makePublicallyAvailableOnBintray := true,
       scalaVersion := "2.11.12",
       libraryDependencies ++= compileDependencies ++ testDependencies,
