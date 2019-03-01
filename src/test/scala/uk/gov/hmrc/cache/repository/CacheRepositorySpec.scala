@@ -16,15 +16,16 @@
 
 package uk.gov.hmrc.cache.repository
 
-import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterEach, Matchers, WordSpecLike}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.{BeforeAndAfterEach, Matchers, OptionValues, WordSpecLike}
 import play.api.libs.json.Json
 import reactivemongo.bson.{BSONLong, BSONObjectID}
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo.{MongoSpecSupport, Saved, Updated}
 
 
-class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach with Eventually {
+class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach
+  with Eventually with OptionValues with IntegrationPatience {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -368,8 +369,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       val modifiedRepository = repo("replaceIndex", 8888888)
       eventually {
         val index = await(modifiedRepository.collection.indexesManager.list()).find(index => index.eventualName == "lastUpdatedIndex")
-        index.isDefined shouldBe true
-        index.get.options.get("expireAfterSeconds").get shouldBe BSONLong(8888888)
+        index.value.options.get("expireAfterSeconds").value shouldBe BSONLong(8888888)
       }
     }
 
