@@ -20,4 +20,6 @@ import scala.concurrent.duration.Duration
 
 case class TimeToLive(duration: Duration) {
   def inSeconds: Long = duration.toSeconds
+
+  override def toString: String = duration.toString
 }

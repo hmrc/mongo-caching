@@ -27,23 +27,23 @@ class TimeToLiveTestSpec extends WordSpecLike {
     val conf = Map("cache.expiryInMinutes" -> "6")
 
     "yield the default value when there is no config to read " in {
-      running(new GuiceApplicationBuilder().build()) {
-        val ttl = new TimeToLive {}
-        ttl.defaultExpireAfter should be(300)
+      running() { app =>
+        val ttl = app.injector.instanceOf[TimeToLive]
+        ttl.inSeconds should be(300)
       }
     }
 
     "read the 'cache.expiryInMinutes' config value " in {
-      running(new GuiceApplicationBuilder().configure(conf).build()) {
-        val ttl = new TimeToLive {}
-        ttl.defaultExpireAfter should be(360)
+      running(_.configure(conf)) { app =>
+        val ttl = app.injector.instanceOf[TimeToLive]
+        ttl.inSeconds should be(360)
       }
     }
 
     "yield the default value when 'cache.expiryInMinutes' config is missing" in {
-      running(new GuiceApplicationBuilder().build()) {
-        val ttl = new TimeToLive {}
-        ttl.defaultExpireAfter should be(300)
+      running() { app =>
+        val ttl = app.injector.instanceOf[TimeToLive]
+        ttl.inSeconds should be(300)
       }
     }
   }

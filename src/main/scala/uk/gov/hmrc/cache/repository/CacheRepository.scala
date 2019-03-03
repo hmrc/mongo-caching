@@ -36,13 +36,19 @@ trait CacheRepository extends ReactiveRepository[Cache, Id] {
 
 @deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
 object CacheRepository extends MongoDbConnection {
-
-  def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository = new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
+  @deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
+  def apply(collectionNameProvidedBySource: String,
+            expireAfterSeconds: TimeToLive,
+            cacheFormats: Format[Cache])
+           (implicit ec: ExecutionContext): CacheRepository = {
+    new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
+  }
 }
 
 class CacheMongoRepository(collName: String,
                            override val expireAfter: TimeToLive,
-                           cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
+                           cacheFormats: Format[Cache] = Cache.mongoFormats)
+                          (implicit mongo: () => DB, ec: ExecutionContext)
   extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
     with CacheRepository with TTLIndexing[Cache]
     with BSONBuilderHelpers {
@@ -66,7 +72,7 @@ class CacheMongoRepository(collName: String,
         upsert = true,
         fetchNewObject = true
       ).recoverWith {
-        case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
+        case e: DefaultJSONCommandError if e.code.contains(11000) => upsert // Retry after unique index violation
       }
     }
 

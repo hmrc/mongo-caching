@@ -37,10 +37,27 @@ trait CachingController {
 ```
 or class example
 ```scala
-class CachingController @Inject(val expiredAfter: TimeToLive) {
+class CachingController @Inject()(val expiredAfter: TimeToLive) {
   // Implementation 
 }
 ```
+
+##### Extending `CachingControllerExample`
+```scala
+class MyController extends CachingController with TimeToLive {
+  // Implementation 
+}
+```
+
+is now
+
+```scala
+class MyController @Inject()(val expiredAfter: TimeToLive) extends CachingController {
+  // Implementation 
+}
+````
+
+Every usage of caching controller require changes from extending `TimeToLive` to injected paramters like above.
 
 ####
 
@@ -64,6 +81,7 @@ class CacheMongoRepository(collName: String,
                            cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
 ```
 
+#### 
 
 
 ## License ##

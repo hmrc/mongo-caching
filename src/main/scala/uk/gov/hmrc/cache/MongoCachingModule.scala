@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.cache
 
-import com.google.inject.AbstractModule
+import play.api.{Configuration, Environment}
+import play.api.inject.{Binding, Module}
 
-class MongoCachingModule extends AbstractModule{
-  override def configure(): Unit = {
-    bind(classOf[TimeToLive]).toProvider(classOf[TimeToLiveProvider])
-  }
+class MongoCachingModule extends Module {
+  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = Seq(
+    bind[TimeToLive].toProvider[TimeToLiveProvider]
+  )
 }

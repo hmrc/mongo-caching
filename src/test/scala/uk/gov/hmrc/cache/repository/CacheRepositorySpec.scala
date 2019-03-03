@@ -20,6 +20,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterEach, Matchers, OptionValues, WordSpecLike}
 import play.api.libs.json.Json
 import reactivemongo.bson.{BSONLong, BSONObjectID}
+import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo.{DatabaseUpdate, MongoSpecSupport, Saved, Updated}
 
@@ -36,10 +37,13 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   def await[A](future: Future[A])(implicit timeout: Duration) = Await.result(future, timeout)
 
 
-  private val expireAfter28DaysInSeconds = 60 * 60 * 24 * 7 * 4
+  private val expireAfter28Days = TimeToLive(24.days)
 
-  private def repo(name: String, expiresAfter: Long = expireAfter28DaysInSeconds) = new CacheMongoRepository(name, expiresAfter) {
-    await(super.ensureIndexes)
+  private def repo(name: String, expiresAfter: TimeToLive = expireAfter28Days) = {
+    val repo = new CacheMongoRepository(name, expiresAfter)
+    Thread.sleep(1000) // require by fire and forget call in ReactiveRepository constructor
+    await(repo.ensureIndexes)
+    repo
   }
 
   override protected def beforeEach() = {
@@ -108,7 +112,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "handle parallel processing - race condition" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata2")
         val id: Id = "numberId"
         val jsonNumber = Json.toJson(123)
 
@@ -123,7 +127,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsNumber Double" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata3")
         val id: Id = "numberDoubleId"
         val jsonNumber = Json.toJson(999.99)
 
@@ -135,7 +139,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsString" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata4")
         val id: Id = "stringId"
         val jsonString = Json.toJson("some simple string")
 
@@ -146,7 +150,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsBoolean" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata5")
         val id: Id = "booleanId"
         val jsonBoolean = Json.toJson(true)
 
@@ -157,7 +161,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsArray Integer" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata6")
         val id: Id = "arrayIntId"
         val jsonArray = Json.toJson(List(1,2,3,4))
 
@@ -168,7 +172,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsArray String" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata7")
         val id: Id = "arrayStringId"
         val jsonArray = Json.toJson(List("apple","pear","orange"))
 
@@ -179,7 +183,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read JsValue type JsArray Double" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata8")
         val id: Id = "arrayDoubleId"
         val jsonArray = Json.toJson(List(123.11,456.22,789.33))
 
@@ -190,7 +194,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       }
 
       "write and read a JsValue type JsArray user-defined" in new TestSetup {
-        val repository = repo("simpledata")
+        val repository = repo("simpledata9")
         val id: Id = "arrayUserDefinedId"
 
         case class SubUserDefined(a:String)
@@ -209,7 +213,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       "Saving a key with empty json will create a mongo record with no data attribute, " +
         "saving the same key with non empty json will update the record and create the data attribute with the specified key" in new TestSetup {
 
-        val repository = repo("simpledata")
+        val repository = repo("simpledata10")
         val id: Id = "unsetId"
 
         await(repository.createOrUpdate(id, "searched-person", Json.parse("{}")))
@@ -331,7 +335,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
 
       "only unset the JSON contents of the key that was supplied with empty json object and leave the other key untouched" in new TestSetup {
 
-        val repository = repo("unsetJSValue")
+        val repository = repo("unsetJSValue1")
         val id: Id = "testClearJsValueIdB"
 
         val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
@@ -367,8 +371,8 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         index.eventualName == "lastUpdatedIndex"
       })
       oldIndex.isDefined shouldBe true
-      oldIndex.get.options.get("expireAfterSeconds").get shouldBe BSONLong(expireAfter28DaysInSeconds)
-      val modifiedRepository = repo("replaceIndex", 8888888)
+      oldIndex.get.options.get("expireAfterSeconds").get shouldBe BSONLong(expireAfter28Days.inSeconds)
+      val modifiedRepository = repo("replaceIndex", TimeToLive(8888888.seconds))
       eventually {
         val index = await(modifiedRepository.collection.indexesManager.list()).find(index => index.eventualName == "lastUpdatedIndex")
         index.value.options.get("expireAfterSeconds").value shouldBe BSONLong(8888888)

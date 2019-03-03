@@ -27,7 +27,8 @@ val compileDependencies = PlayCrossCompilation.dependencies(
 val testDependencies = PlayCrossCompilation.dependencies(
   shared = Seq(
     "org.scalatest"     %% "scalatest"              % "3.0.5"             % "test",
-    "org.pegdown"       % "pegdown"                 % "1.4.2"             % "test"
+    "org.pegdown"       % "pegdown"                 % "1.4.2"             % "test",
+    "ch.qos.logback"    % "logback-classic"         % "1.2.3"             % "test"
   ),
   play25 = Seq(
     "com.typesafe.play"      %% "play-test"          % play25              % "test",

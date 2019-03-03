@@ -24,8 +24,7 @@ import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
 import scala.concurrent.Future
 
-trait CachingController extends MongoDbConnection with TimeToLive {
-  self: Controller =>
+trait CachingController extends MongoDbConnection { self: Controller =>
 
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
@@ -33,6 +32,8 @@ trait CachingController extends MongoDbConnection with TimeToLive {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   lazy val cacheMongoFormats: Format[Cache] = Cache.mongoFormats
+
+  def defaultExpireAfter: TimeToLive
 
   private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, cacheMongoFormats)
 

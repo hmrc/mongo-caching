@@ -24,6 +24,7 @@ import uk.gov.hmrc.cache.model.Id
 import uk.gov.hmrc.mongo.ReactiveRepository
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 trait TTLIndexing[A] { self: ReactiveRepository[A, Id] =>
 
@@ -41,7 +42,8 @@ trait TTLIndexing[A] { self: ReactiveRepository[A, Id] =>
       idxToUpdate.fold[Future[Seq[Boolean]]](ensureLastUpdated) { index =>
         collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
       }.andThen {
-        case _ => Logger.info(s"Time to live indexes for entries in ${collection.name} created")
+        case Success(_) => Logger.info(s"Time to live indexes for entries in ${collection.name} created")
+        case Failure(_) => Logger.warn(s"Failed to create time to live indexes for entries in ${collection.name}")
       }
     }
   }
