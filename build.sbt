@@ -52,5 +52,6 @@ lazy val mongoCache = Project(libName, file("."))
         Resolver.bintrayRepo("hmrc", "releases"),
         Resolver.jcenterRepo
       ),
-      crossScalaVersions := Seq("2.11.12", "2.12.8")
+      crossScalaVersions := Seq("2.11.12", "2.12.8"),
+      fork in Test := true
     ).settings(PlayCrossCompilation.playCrossCompilationSettings)
