@@ -16,6 +16,16 @@
 
 package uk.gov.hmrc.cache
 
-import scala.concurrent.duration.Duration
+import javax.inject.{Inject, Provider}
+import play.api.Configuration
 
-case class TimeToLive(duration: Duration)
+import scala.concurrent.duration.{Duration, MINUTES}
+
+class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provider[TimeToLive]{
+  private val fiveMinutes = 5L
+
+  // FIXME - here is potential bug
+  override val get: TimeToLive = TimeToLive(
+    Duration(configuration.getMilliseconds("cache.expiryInMinutes").getOrElse(fiveMinutes), MINUTES)
+  )
+}

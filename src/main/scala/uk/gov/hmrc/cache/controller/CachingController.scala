@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
- package uk.gov.hmrc.cache.controller
+package uk.gov.hmrc.cache.controller
 
 import play.api.libs.json._
 import play.api.mvc.{Controller, Request, Result}
@@ -24,7 +24,7 @@ import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
 import scala.concurrent.Future
 
- trait CachingController extends MongoDbConnection with TimeToLive {
+trait CachingController extends MongoDbConnection with TimeToLive {
   self: Controller =>
 
   import play.api.libs.json.JsValue

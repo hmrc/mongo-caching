@@ -16,6 +16,10 @@
 
 package uk.gov.hmrc.cache
 
-import scala.concurrent.duration.Duration
+import com.google.inject.AbstractModule
 
-case class TimeToLive(duration: Duration)
+class MongoCachingModule extends AbstractModule{
+  override def configure(): Unit = {
+    bind(classOf[TimeToLive]).toProvider(classOf[TimeToLiveProvider])
+  }
+}
