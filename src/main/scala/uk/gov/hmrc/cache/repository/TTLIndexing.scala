@@ -18,72 +18,46 @@ package uk.gov.hmrc.cache.repository
 
 import play.api.Logger
 import reactivemongo.api.indexes.{Index, IndexType}
-import reactivemongo.bson.{BSONDocument, BSONInteger, BSONLong, BSONString}
-import reactivemongo.core.commands.{BSONCommandResultMaker, Command, CommandError}
+import reactivemongo.bson.BSONDocument
+import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Id
 import uk.gov.hmrc.mongo.ReactiveRepository
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait TTLIndexing[A] {
-  self: ReactiveRepository[A, Id] =>
+trait TTLIndexing[A] { self: ReactiveRepository[A, Id] =>
 
-  val expireAfterSeconds: Long
-
-  private lazy val LastUpdatedIndex = "lastUpdatedIndex"
-  private lazy val OptExpireAfterSeconds = "expireAfterSeconds"
+  val expireAfter: TimeToLive
 
   override def ensureIndexes(implicit ec: ExecutionContext): Future[Seq[Boolean]] = {
     import reactivemongo.bson.DefaultBSONHandlers._
-
     val indexes = collection.indexesManager.list()
-    indexes.flatMap {
-      idxs => {
-        val idxToUpdate = idxs.find(index =>
-          index.eventualName == LastUpdatedIndex
-            && index.options.getAs[BSONLong](OptExpireAfterSeconds).getOrElse(BSONLong(expireAfterSeconds)).as[Long] != expireAfterSeconds)
-
-        idxToUpdate.fold(ensureLastUpdated){ index =>
-          collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
-        }
+    indexes.flatMap { indexList =>
+      val idxToUpdate = indexList.find { index =>
+        val indexExpirationTime = index.options.getAs[Long](TTLIndexing.optExpireAfterSeconds)
+        index.eventualName == TTLIndexing.lastUpdatedIndexName && !indexExpirationTime.contains(expireAfter.inSeconds)
+      }
+      Logger.info(s"Creating time to live index for entries in ${collection.name} to $expireAfter seconds")
+      idxToUpdate.fold[Future[Seq[Boolean]]](ensureLastUpdated) { index =>
+        collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
+      }.andThen {
+        case _ => Logger.info(s"Time to live indexes for entries in ${collection.name} created")
       }
     }
-    Logger.info(s"Creating time to live for entries in ${collection.name} to $expireAfterSeconds seconds")
-    ensureLastUpdated
   }
 
-  private def ensureLastUpdated(implicit ec: ExecutionContext) = {
-    Future.sequence(Seq(collection.indexesManager.ensure(
+  private def ensureLastUpdated(implicit ec: ExecutionContext): Future[Seq[Boolean]] = {
+    collection.indexesManager.ensure(
       Index(
         key = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),
-        name = Some(LastUpdatedIndex),
-        options = BSONDocument(OptExpireAfterSeconds -> expireAfterSeconds)
+        name = Some(TTLIndexing.lastUpdatedIndexName),
+        options = BSONDocument(TTLIndexing.optExpireAfterSeconds -> expireAfter.inSeconds)
       )
-    )))
+    ).map(Seq(_))
   }
 }
 
-
-/**
- * 20-May-2014
- * The following code is a workaround for a bug we found in reactivemongo indexesManager.delete() method.
- * The issue only happens with the current version of mongodb (2.6.1) but not with
- * the version the we have on higher environments including production (2.4.8). The patch is intentionally left here
- * so that it can be applied again if mongodb is upgraded and the bug is not fixed in reactivemongo. In which case, the call to
- * indexesManager.delete() in the ensureIndexes() method of this class should be replaced with the following:
- *
- * deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
- */
-sealed case class DeleteIndex(
-                               collection: String,
-                               index: String) extends Command[Int] {
-  override def makeDocuments = BSONDocument(
-    "deleteIndexes" -> BSONString(collection),
-    "index" -> BSONString(index))
-
-  object ResultMaker extends BSONCommandResultMaker[Int] {
-    def apply(document: BSONDocument) =
-      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONInteger]("nIndexesWas").map(_.value).get)
-  }
-
+object TTLIndexing {
+  private val lastUpdatedIndexName = "lastUpdatedIndex"
+  private val optExpireAfterSeconds = "expireAfterSeconds"
 }

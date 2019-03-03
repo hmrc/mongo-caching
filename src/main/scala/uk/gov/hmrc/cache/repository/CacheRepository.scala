@@ -22,6 +22,7 @@ import reactivemongo.api.DB
 import reactivemongo.api.commands.LastError
 import reactivemongo.bson._
 import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
+import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
@@ -40,7 +41,7 @@ object CacheRepository extends MongoDbConnection {
 }
 
 class CacheMongoRepository(collName: String,
-                           override val expireAfterSeconds: Long,
+                           override val expireAfter: TimeToLive,
                            cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
   extends ReactiveRepository[Cache, Id](collName, mongo, cacheFormats, Id.idFormats)
     with CacheRepository with TTLIndexing[Cache]
@@ -55,53 +56,48 @@ class CacheMongoRepository(collName: String,
   override def createOrUpdate[T](id: Id, key: String, value: T)(implicit writes: Writes[T]): Future[DatabaseUpdate[Cache]] = {
     val toCache = writes.writes(value)
 
-    withCurrentTime {
-
-      implicit time =>
-
-        withCurrentTime { time =>
-          def upsert: Future[JSONFindAndModifyCommand.FindAndModifyResult] = findAndUpdate(
-            Json.obj(Id -> id.id),
-            Json.obj(
-              "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
-              "$setOnInsert" -> Json.obj("modifiedDetails.createdAt" -> time, Id -> id.id, AtomicId -> BSONObjectID.generate())
-            ),
-            upsert = true,
-            fetchNewObject = true
-          ).recoverWith {
-            case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
-          }
-
-          def handleOutcome(outcome: JSONFindAndModifyCommand.FindAndModifyResult): Future[DatabaseUpdate[Cache]] = {
-            (outcome.lastError, outcome.result[Cache]) match {
-              case (Some(error), Some(value)) =>
-                val lastError = LastError(
-                  ok                = true,
-                  errmsg            = None,
-                  code              = None,
-                  lastOp            = None,
-                  n                 = error.n,
-                  singleShard       = None,
-                  updatedExisting   = error.updatedExisting,
-                  upserted          = None,
-                  wnote             = None,
-                  wtimeout          = false,
-                  waited            = None,
-                  wtime             = None,
-                  writeErrors       = Nil,
-                  writeConcernError = None
-                )
-                if (error.updatedExisting) {
-                  Future.successful(DatabaseUpdate(lastError, Updated(value, value)))
-                } else {
-                  Future.successful(DatabaseUpdate(lastError, Saved(value)))
-                }
-              case _ => throw new EntityNotFoundException("Failed to receive updated object!")
-            }
-          }
-
-          upsert.flatMap(handleOutcome)
-        }
+    def upsert: Future[JSONFindAndModifyCommand.FindAndModifyResult] = withCurrentTime { time =>
+      findAndUpdate(
+        Json.obj(Id -> id.id),
+        Json.obj(
+          "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
+          "$setOnInsert" -> Json.obj("modifiedDetails.createdAt" -> time, Id -> id.id, AtomicId -> BSONObjectID.generate())
+        ),
+        upsert = true,
+        fetchNewObject = true
+      ).recoverWith {
+        case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
+      }
     }
+
+    def handleOutcome(outcome: JSONFindAndModifyCommand.FindAndModifyResult): Future[DatabaseUpdate[Cache]] = {
+      (outcome.lastError, outcome.result[Cache]) match {
+        case (Some(error), Some(value)) =>
+          val lastError = LastError(
+            ok = true,
+            errmsg = None,
+            code = None,
+            lastOp = None,
+            n = error.n,
+            singleShard = None,
+            updatedExisting = error.updatedExisting,
+            upserted = None,
+            wnote = None,
+            wtimeout = false,
+            waited = None,
+            wtime = None,
+            writeErrors = Nil,
+            writeConcernError = None
+          )
+          if (error.updatedExisting) {
+            Future.successful(DatabaseUpdate(lastError, Updated(value, value)))
+          } else {
+            Future.successful(DatabaseUpdate(lastError, Saved(value)))
+          }
+        case _ => throw new EntityNotFoundException("Failed to receive updated object!")
+      }
+    }
+
+    upsert.flatMap(handleOutcome)
   }
 }

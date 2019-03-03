@@ -18,4 +18,6 @@ package uk.gov.hmrc.cache
 
 import scala.concurrent.duration.Duration
 
-case class TimeToLive(duration: Duration)
+case class TimeToLive(duration: Duration) {
+  def inSeconds: Long = duration.toSeconds
+}

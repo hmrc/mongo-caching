@@ -42,6 +42,30 @@ class CachingController @Inject(val expiredAfter: TimeToLive) {
 }
 ```
 
+####
+
+#### Trait `TTLIndexing` now use `expireAfter: TimeToLive` instead `expiresAfterSeconds: Long`
+
+Using specialised type is less error prone and makes usage of DI easier. This change affect only code which
+have custom implementation of `CacheRepository`. 
+
+##### Before
+
+```scala
+class CacheMongoRepository(collName: String,
+                           override val expireAfterSeconds: Long,
+                           cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
+```
+
+##### After
+```scala
+class CacheMongoRepository(collName: String,
+                           override val expireAfter: TimeToLive,
+                           cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
+```
+
+
+
 ## License ##
  
 This code is open source software licensed under the [Apache 2.0 License]("http://www.apache.org/licenses/LICENSE-2.0.html").
