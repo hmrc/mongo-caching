@@ -15,9 +15,55 @@ libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "[INSERT_VERSION]"
 ```
 For Java 7 use a version <= 0.7.1
 
+## Configuration
+
+### Custom default expire time
+in `application.conf` key `cache.expire` describe cache duration. 
+For more syntax please visit [HOCON duration](https://github.com/lightbend/config/blob/master/HOCON.md#duration-format)
+```
+cache.exipre = 6 weeks
+```
+
 ## Migrations
 
 ### Changes in 6.x line
+
+#### `CacheRepository#apply` is depreacated now - use `CacheRepositoryFactory` 
+`CacheRepository#apply` use  global `MongoComponent` which depends on `Play` global. 
+
+#####Before
+```scala
+class CachingController extends Controller { =>
+
+  val formCache = CacheRepository("form", defaultExpireAfter, Cache.mongoFormats) 
+  
+}
+```
+
+#####After
+```scala
+class CachingController @Inject(factory: CacheRepositoryFactory) extends Controller { =>
+
+  val formCache = factory.create("form") 
+  
+}
+```
+
+#### Configuration key `cache.expiryInMinutes` now become `cache.expiry`
+
+##### Before 
+
+```config
+cache.expiryInMinutes = 5
+```
+
+##### After
+
+```config
+cache.expiry = 5 minutes
+```
+
+
 
 #### Trait `TimeToLive` is now case class for injecting
 
@@ -81,7 +127,6 @@ class CacheMongoRepository(collName: String,
                            cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)
 ```
 
-#### 
 
 
 ## License ##

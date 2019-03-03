@@ -18,13 +18,25 @@ package uk.gov.hmrc.cache
 
 import javax.inject.{Inject, Provider}
 import play.api.Configuration
+import play.api.Logger
 
 import scala.concurrent.duration.{Duration, MINUTES}
 
 class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provider[TimeToLive]{
-  private val fiveMinutes = Duration(5L, MINUTES)
 
-  override val get: TimeToLive = TimeToLive(
-    configuration.get[Option[Duration]]("cache.expiryInMinutes").getOrElse(fiveMinutes)
-  )
+  /**
+    * Compatibility layer with old configuration if cache
+    */
+  override val get: TimeToLive = {
+    val oldConfiguration = configuration.get[Option[Long]]("cache.expiryInMinutes")
+      .map(value => Duration(value, MINUTES))
+    oldConfiguration.foreach { _ =>
+      Logger.warn(
+        """Application use `cache.expiryInMinutes` deprecated in 6.x line -
+          |please migrate configuration according to mongo-caching README""".stripMargin
+      )
+    }
+    val newConfiguration = configuration.get[Duration]("cache.expiry")
+    TimeToLive(oldConfiguration.getOrElse(newConfiguration))
+  }
 }

@@ -18,14 +18,13 @@ package uk.gov.hmrc.cache
 
 import org.scalatest.Matchers._
 import org.scalatest.WordSpecLike
+import play.api.Configuration
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.Helpers._
 
 class TimeToLiveTestSpec extends WordSpecLike {
 
   "TimeToLive" should {
-    val conf = Map("cache.expiryInMinutes" -> "6")
-
     "yield the default value when there is no config to read " in {
       running() { app =>
         val ttl = app.injector.instanceOf[TimeToLive]
@@ -34,16 +33,18 @@ class TimeToLiveTestSpec extends WordSpecLike {
     }
 
     "read the 'cache.expiryInMinutes' config value " in {
-      running(_.configure(conf)) { app =>
+      val oldConf = Configuration("cache.expiryInMinutes" -> "6")
+      running(_.configure(oldConf)) { app =>
         val ttl = app.injector.instanceOf[TimeToLive]
         ttl.inSeconds should be(360)
       }
     }
 
-    "yield the default value when 'cache.expiryInMinutes' config is missing" in {
-      running() { app =>
+    "read the 'cache.expiry' config value " in {
+      val newConf = Configuration("cache.expiry" -> "6 minutes")
+      running(_.configure(newConf)) { app =>
         val ttl = app.injector.instanceOf[TimeToLive]
-        ttl.inSeconds should be(300)
+        ttl.inSeconds should be(360)
       }
     }
   }

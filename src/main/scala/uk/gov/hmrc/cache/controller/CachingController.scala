@@ -18,24 +18,25 @@ package uk.gov.hmrc.cache.controller
 
 import play.api.libs.json._
 import play.api.mvc.{Controller, Request, Result}
-import play.modules.reactivemongo.MongoDbConnection
+import play.modules.reactivemongo.{MongoDbConnection, ReactiveMongoComponent}
 import reactivemongo.api.commands._
 import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.Cache
+
 import scala.concurrent.Future
 
-trait CachingController extends MongoDbConnection { self: Controller =>
+trait CachingController { self: Controller =>
 
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
   import uk.gov.hmrc.cache.repository.CacheRepository
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  lazy val cacheMongoFormats: Format[Cache] = Cache.mongoFormats
-
   def defaultExpireAfter: TimeToLive
 
-  private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, cacheMongoFormats)
+  def mongo: ReactiveMongoComponent
+
+  private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, Cache.mongoFormats)
 
   def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id).map {
     case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))

@@ -16,8 +16,9 @@
 
 package uk.gov.hmrc.cache.repository
 
+import javax.inject.Inject
 import play.api.libs.json._
-import play.modules.reactivemongo.MongoDbConnection
+import play.modules.reactivemongo.{MongoDbConnection, ReactiveMongoComponent}
 import reactivemongo.api.DB
 import reactivemongo.api.commands.LastError
 import reactivemongo.bson._
@@ -34,15 +35,28 @@ trait CacheRepository extends ReactiveRepository[Cache, Id] {
   def createOrUpdate[T](id: Id, key: String, toCache: T)(implicit writes: Writes[T]): Future[DatabaseUpdate[Cache]]
 }
 
-@deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
+@deprecated("Please use injected CacheRepositoryFactory for CacheRepository creation", since = "6.x")
 object CacheRepository extends MongoDbConnection {
-  @deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
+  @deprecated("Please use injected CacheRepositoryFactory to CacheRepository creation", since = "6.x")
   def apply(collectionNameProvidedBySource: String,
             expireAfterSeconds: TimeToLive,
             cacheFormats: Format[Cache])
            (implicit ec: ExecutionContext): CacheRepository = {
     new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
   }
+}
+
+class CacheRepositoryFactory @Inject()(reactiveMongoComponent: ReactiveMongoComponent,
+                                       defaultExpireAfter: TimeToLive,
+                                       executionContext: ExecutionContext) {
+
+  private val cacheFormats = implicitly[Format[Cache]]
+
+  def create(collection: String): CacheRepository =
+    new CacheMongoRepository(collection, defaultExpireAfter, cacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
+
+  def create(collection: String, expireAfter: TimeToLive): CacheRepository =
+    new CacheMongoRepository(collection, expireAfter, cacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
 }
 
 class CacheMongoRepository(collName: String,
