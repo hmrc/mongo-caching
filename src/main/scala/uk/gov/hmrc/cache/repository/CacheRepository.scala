@@ -19,6 +19,7 @@ package uk.gov.hmrc.cache.repository
 import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
+import reactivemongo.api.commands.LastError
 import reactivemongo.bson._
 import reactivemongo.core.commands.BSONCommandError
 import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
@@ -75,15 +76,26 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
           def handleOutcome(outcome: JSONFindAndModifyCommand.FindAndModifyResult): Future[DatabaseUpdate[Cache]] = {
             (outcome.lastError, outcome.result[Cache]) match {
               case (Some(error), Some(value)) =>
-                println(value)
-                if (error.n > 0) {
-                  if (error.updatedExisting) {
-                    Future.successful(DatabaseUpdate(null, Updated(null, value)))
-                  } else {
-                    Future.successful(DatabaseUpdate(null, Saved(value)))
-                  }
+                val lastError = LastError(
+                  ok                = true,
+                  errmsg            = None,
+                  code              = None,
+                  lastOp            = None,
+                  n                 = error.n,
+                  singleShard       = None,
+                  updatedExisting   = error.updatedExisting,
+                  upserted          = None,
+                  wnote             = None,
+                  wtimeout          = false,
+                  waited            = None,
+                  wtime             = None,
+                  writeErrors       = Nil,
+                  writeConcernError = None
+                )
+                if (error.updatedExisting) {
+                  Future.successful(DatabaseUpdate(lastError, Updated(value, value)))
                 } else {
-                  upsert flatMap handleOutcome
+                  Future.successful(DatabaseUpdate(lastError, Saved(value)))
                 }
               case _ => throw new EntityNotFoundException("Failed to receive updated object!")
             }
