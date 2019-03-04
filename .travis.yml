@@ -1,8 +1,16 @@
 language: scala
-scala:
-- 2.11.7
-jdk:
-- oraclejdk8
+matrix:
+  include:
+    - scala: 2.11.12
+      env: PLAY_VERSION=2.5
+      jdk: oraclejdk8
+    - scala: 2.11.12
+      env: PLAY_VERSION=2.6
+      jdk: oraclejdk8
+    - scala: 2.12.8
+      env: PLAY_VERSION=2.6
+      jdk: oraclejdk8
+
 notifications:
   email:
     recipients:

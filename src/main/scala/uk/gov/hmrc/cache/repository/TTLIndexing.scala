@@ -18,42 +18,33 @@ package uk.gov.hmrc.cache.repository
 
 import play.api.Logger
 import reactivemongo.api.indexes.{Index, IndexType}
-import reactivemongo.bson.{BSONInteger, BSONDocument, BSONLong, BSONString}
-import reactivemongo.core.commands.{CommandError, BSONCommandResultMaker, Command, Status}
+import reactivemongo.bson.{BSONDocument, BSONInteger, BSONLong, BSONString}
+import reactivemongo.core.commands.{BSONCommandResultMaker, Command, CommandError}
 import uk.gov.hmrc.cache.model.Id
 import uk.gov.hmrc.mongo.ReactiveRepository
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait TTLIndexing[A] {
   self: ReactiveRepository[A, Id] =>
-
-  import scala.concurrent.ExecutionContext.Implicits.global
 
   val expireAfterSeconds: Long
 
   private lazy val LastUpdatedIndex = "lastUpdatedIndex"
   private lazy val OptExpireAfterSeconds = "expireAfterSeconds"
 
-  override def ensureIndexes(implicit ec: scala.concurrent.ExecutionContext): Future[Seq[Boolean]] = {
+  override def ensureIndexes(implicit ec: ExecutionContext): Future[Seq[Boolean]] = {
     import reactivemongo.bson.DefaultBSONHandlers._
 
     val indexes = collection.indexesManager.list()
     indexes.flatMap {
       idxs => {
-
         val idxToUpdate = idxs.find(index =>
           index.eventualName == LastUpdatedIndex
             && index.options.getAs[BSONLong](OptExpireAfterSeconds).getOrElse(BSONLong(expireAfterSeconds)).as[Long] != expireAfterSeconds)
 
-        if (idxToUpdate.isDefined) {
-          for {
-            deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
-            updated <- ensureLastUpdated
-          } yield updated
-        }
-        else {
-          ensureLastUpdated
+        idxToUpdate.fold(ensureLastUpdated){ index =>
+          collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
         }
       }
     }
@@ -61,7 +52,7 @@ trait TTLIndexing[A] {
     ensureLastUpdated
   }
 
-  private def ensureLastUpdated = {
+  private def ensureLastUpdated(implicit ec: ExecutionContext) = {
     Future.sequence(Seq(collection.indexesManager.ensure(
       Index(
         key = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),

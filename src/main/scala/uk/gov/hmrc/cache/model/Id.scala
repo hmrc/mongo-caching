@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.cache.model
 
-import play.api.libs.json.{JsResult, JsString, JsValue}
+import play.api.libs.json.{JsError, JsResult, JsString, JsValue}
 
 case class Id(id: String)
 
@@ -33,7 +33,7 @@ object Id {
   private val idRead: Reads[Id] = new Reads[Id] {
     override def reads(js: JsValue): JsResult[Id] = js match {
       case v: JsString => v.validate[String].map(Id.apply)
-      case noParsed => throw new Exception(s"Could not read Json value of 'id' in $noParsed")
+      case noParsed => JsError(s"Could not read Json value of 'id' in $noParsed")
     }
   }
   implicit val idFormats = Format(idRead, idWrite)
