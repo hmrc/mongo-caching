@@ -21,7 +21,6 @@ import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
 import reactivemongo.api.commands.LastError
 import reactivemongo.bson._
-import reactivemongo.core.commands.BSONCommandError
 import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
