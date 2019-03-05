@@ -24,19 +24,20 @@ import play.api.{Configuration, Logger}
 import scala.concurrent.duration.{Duration, MINUTES}
 
 class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provider[TimeToLive]{
-  private val fiveMinutes = 5L
-
-  // FIXME - here is potential bug
   override val get: TimeToLive = {
     val oldConfiguration = configuration.getLong("cache.expiryInMinutes")
-      .map( value: Long => Duration(value, MINUTES) )
+      .map( value => Duration(value, MINUTES) )
     oldConfiguration.foreach { _ =>
       Logger.warn(
         """Application use `cache.expiryInMinutes` deprecated in mongo-caching 6.x -
           |please migrate configuration according to README""".stripMargin
       )
     }
-    val newConfiguration = Duration(configuration.getMilliseconds("cache.expiry").get, TimeUnit.MILLISECONDS)
+    val newKey = "cache.expiry"
+    val newConfiguration = Duration(configuration.getMilliseconds(newKey).get, TimeUnit.MILLISECONDS)
+    if(oldConfiguration.isEmpty && newConfiguration.toMinutes == 0){
+      throw new Exception(s"Please use unit for `$newKey` - expire time is less then one second")
+    }
     TimeToLive(oldConfiguration.getOrElse(newConfiguration))
   }
 }

@@ -26,14 +26,14 @@ cache.exipre = 6 weeks
 
 ## Migrations
 
-### Changes in 6.x line
+### Changes in 7.x line
 
 #### `CacheRepository#apply` is depreacated now - use `CacheRepositoryFactory` 
 `CacheRepository#apply` use  global `MongoComponent` which depends on `Play` global. 
 
 #####Before
 ```scala
-class CachingController extends Controller { =>
+class MyController extends Controller { =>
 
   val formCache = CacheRepository("form", defaultExpireAfter, Cache.mongoFormats) 
   
@@ -42,7 +42,7 @@ class CachingController extends Controller { =>
 
 #####After
 ```scala
-class CachingController @Inject(factory: CacheRepositoryFactory) extends Controller { =>
+class MyController @Inject()(factory: CacheRepositoryFactory) extends Controller { =>
 
   val formCache = factory.create("form") 
   
@@ -51,19 +51,42 @@ class CachingController @Inject(factory: CacheRepositoryFactory) extends Control
 
 #### Configuration key `cache.expiryInMinutes` now become `cache.expiry`
 
+On startup application would log warning if old configuration is still in use
+
 ##### Before 
 
-```config
+```hocon
 cache.expiryInMinutes = 5
 ```
 
 ##### After
 
-```config
+```hocon
 cache.expiry = 5 minutes
 ```
 
+#### Migration `CachingController` for play 2.6
 
+Caching controller require only `CachingRepositoryFactory` - it is provided through DI.
+
+```scala
+class ExampleController @Inject(cc: ControllerComponents,
+                                val cacheRepositoryFactory: CacheRepositoryFactory) extends AbstractController(cc) with CachingController {
+
+}
+```
+
+#### Migration `CachingController` for play 2.5
+
+Caching controller require only `CachingRepositoryFactory` and `ExecutionContext` both are provided via DI.
+
+```scala
+class ExampleController @Inject(cc: ControllerComponents,
+                                val cacheRepositoryFactory: CacheRepositoryFactory,
+                                val executionContext: ExecutionContext) extends Controller with CachingController {
+
+}
+```
 
 #### Trait `TimeToLive` is now case class for injecting
 
@@ -102,8 +125,6 @@ class MyController @Inject()(val expiredAfter: TimeToLive) extends CachingContro
   // Implementation 
 }
 ````
-
-Every usage of caching controller require changes from extending `TimeToLive` to injected paramters like above.
 
 ####
 

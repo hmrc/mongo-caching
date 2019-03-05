@@ -36,7 +36,11 @@ class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provide
           |please migrate configuration according to mongo-caching README""".stripMargin
       )
     }
-    val newConfiguration = configuration.get[Duration]("cache.expiry")
+    val newKey = "cache.expiry"
+    val newConfiguration = configuration.get[Duration](newKey)
+    if(oldConfiguration.isEmpty && newConfiguration.toMinutes == 0){
+      throw new Exception(s"Please use unit for `$newKey` - expire time is less then one second")
+    }
     TimeToLive(oldConfiguration.getOrElse(newConfiguration))
   }
 }

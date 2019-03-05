@@ -37,7 +37,7 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   def await[A](future: Future[A])(implicit timeout: Duration) = Await.result(future, timeout)
 
 
-  private val expireAfter28Days = TimeToLive(24.days)
+  private val expireAfter28Days = TimeToLive(28.days)
 
   private def repo(name: String, expiresAfter: TimeToLive = expireAfter28Days) = {
     val repo = new CacheMongoRepository(name, expiresAfter)

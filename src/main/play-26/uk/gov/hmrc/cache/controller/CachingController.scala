@@ -16,37 +16,32 @@
 
 package uk.gov.hmrc.cache.controller
 
-import play.api.libs.json._
-import play.api.mvc.{Controller, Request, Result}
-import play.modules.reactivemongo.{MongoDbConnection, ReactiveMongoComponent}
-import reactivemongo.api.commands._
-import uk.gov.hmrc.cache.TimeToLive
+import play.api.libs.json.{Json, Writes}
+import play.api.mvc.{BaseController, Request, Result}
+import reactivemongo.api.commands.WriteConcern
 import uk.gov.hmrc.cache.model.Cache
+import uk.gov.hmrc.cache.repository.CacheRepositoryFactory
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-trait CachingController { self: Controller =>
+trait CachingController { self: BaseController =>
 
   import play.api.libs.json.JsValue
   import play.api.libs.json.Json._
-  import uk.gov.hmrc.cache.repository.CacheRepository
-  import scala.concurrent.ExecutionContext.Implicits.global
 
-  def defaultExpireAfter: TimeToLive
+  def cacheRepositoryFactory: CacheRepositoryFactory
 
-  def mongo: ReactiveMongoComponent
+  private def keyStoreRepository(source: String) = cacheRepositoryFactory.create(source)
 
-  private def keyStoreRepository(source: String) = CacheRepository(source, defaultExpireAfter, Cache.mongoFormats)
-
-  def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id).map {
+  def find[A](source: String, id: String)(implicit w: Writes[A]) = keyStoreRepository(source).findById(id)(controllerComponents.executionContext).map {
     case Some(cacheable) => Ok(toJson(safeConversion(cacheable)))
     case _ => NotFound("No entity found")
-  }
+  }(controllerComponents.executionContext)
 
-  def dataKeys(source: String, id: String) = keyStoreRepository(source).findById(id).map {
+  def dataKeys(source: String, id: String) = keyStoreRepository(source).findById(id)(controllerComponents.executionContext).map {
     case Some(ks) => Ok(toJson(ks.dataKeys()))
     case _ => NotFound("No entity found")
-  }
+  }(controllerComponents.executionContext)
 
   private def safeConversion(cacheable:Cache) = {
     cacheable.data match {
@@ -60,17 +55,16 @@ trait CachingController { self: Controller =>
       Future.successful(BadRequest("A cacheable key cannot contain dots"))
     } else {
       extractBody { jsBody =>
-
         keyStoreRepository(source).createOrUpdate(id, key, jsBody).map(result => {
           Ok(toJson(safeConversion(result.updateType.savedValue)))
-        })
+        })(controllerComponents.executionContext)
       }
     }
   }
 
-  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id, WriteConcern.Default).map {
+  def remove(source: String, id: String) = keyStoreRepository(source).removeById(id, WriteConcern.Default)(controllerComponents.executionContext).map {
     case lastError if lastError.ok => NoContent
-  }.recover {
+  }(controllerComponents.executionContext).recover {
     case t  => InternalServerError(s"Failed to remove entity '$id' from source '$source'. Error: ${t.getMessage}")
-  }
+  }(controllerComponents.executionContext)
 }
