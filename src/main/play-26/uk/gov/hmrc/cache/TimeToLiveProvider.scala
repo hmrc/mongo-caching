@@ -38,7 +38,7 @@ class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provide
     val newKey = "cache.expiry"
     val newConfiguration = configuration.get[Duration](newKey)
     if(oldConfiguration.isEmpty && newConfiguration.toMinutes == 0){
-      throw new Exception(s"Please use unit for `$newKey` - expire time is less then one second")
+      throw new Exception(s"Please use unit for `$newKey` - expire time is less than one second")
     }
     TimeToLive(oldConfiguration.getOrElse(newConfiguration))
   }
