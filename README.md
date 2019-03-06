@@ -31,7 +31,7 @@ cache.exipre = 6 weeks
 #### `CacheRepository#apply` is depreacated now - use `CacheRepositoryFactory` 
 `CacheRepository#apply` use  global `MongoComponent` which depends on `Play` global. 
 
-#####Before
+##### Before
 ```scala
 class MyController extends Controller { =>
 
@@ -40,7 +40,7 @@ class MyController extends Controller { =>
 }
 ```
 
-#####After
+##### After
 ```scala
 class MyController @Inject()(factory: CacheRepositoryFactory) extends Controller { =>
 
