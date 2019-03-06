@@ -32,8 +32,7 @@ class TimeToLiveProvider @Inject()(configuration: Configuration) extends Provide
       .map(value => Duration(value, MINUTES))
     oldConfiguration.foreach { _ =>
       Logger.warn(
-        """Application use `cache.expiryInMinutes` deprecated in 6.x line -
-          |please migrate configuration according to mongo-caching README""".stripMargin
+        """Application use `cache.expiryInMinutes` deprecated in 7.x line please migrate configuration according to mongo-caching README"""
       )
     }
     val newKey = "cache.expiry"
