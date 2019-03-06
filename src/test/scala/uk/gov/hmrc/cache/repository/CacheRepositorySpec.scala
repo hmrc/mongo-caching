@@ -19,28 +19,37 @@ package uk.gov.hmrc.cache.repository
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterEach, Matchers, OptionValues, WordSpecLike}
 import play.api.libs.json.Json
+import play.modules.reactivemongo.{ReactiveMongoComponent, ReactiveMongoComponentImpl}
 import reactivemongo.bson.{BSONLong, BSONObjectID}
 import uk.gov.hmrc.cache.TimeToLive
 import uk.gov.hmrc.cache.model.{Cache, Id}
-import uk.gov.hmrc.mongo.{DatabaseUpdate, MongoSpecSupport, Saved, Updated}
+import uk.gov.hmrc.mongo._
+
+import scala.concurrent.ExecutionContext
 
 
 class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach
   with Eventually with OptionValues with IntegrationPatience with ScalaFutures {
 
-  import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
   import scala.concurrent.{Await, Future}
+
+  implicit val executionContext = ExecutionContext.global
 
   implicit val defaultTimeout = 5 seconds
 
   def await[A](future: Future[A])(implicit timeout: Duration) = Await.result(future, timeout)
 
-
   private val expireAfter28Days = TimeToLive(28.days)
 
+  val reactiveMongoComponent = new ReactiveMongoComponent {
+    override def mongoConnector: MongoConnector = mongoConnectorForTest
+  }
+
+  val factory = new CacheRepositoryFactory(reactiveMongoComponent, expireAfter28Days, executionContext)
+
   private def repo(name: String, expiresAfter: TimeToLive = expireAfter28Days) = {
-    val repo = new CacheMongoRepository(name, expiresAfter)
+    val repo = factory.create(name, expiresAfter)
     Thread.sleep(1000) // require by fire and forget call in ReactiveRepository constructor
     await(repo.ensureIndexes)
     repo
