@@ -13,6 +13,8 @@ resolvers += Resolver.bintrayRepo("hmrc", "releases")
 
 libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "[INSERT_VERSION]"
 ```
+
+For services with `microservice-bootstrap` use version < 7.0
 For Java 7 use a version <= 0.7.1
 
 ## Configuration

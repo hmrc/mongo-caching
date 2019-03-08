@@ -50,12 +50,15 @@ class CacheRepositoryFactory @Inject()(reactiveMongoComponent: ReactiveMongoComp
                                        defaultExpireAfter: TimeToLive,
                                        executionContext: ExecutionContext) {
 
-  private val cacheFormats = implicitly[Format[Cache]]
+  private val defaultCacheFormats = Cache.mongoFormats
 
   def create(collection: String): CacheRepository =
-    new CacheMongoRepository(collection, defaultExpireAfter, cacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
+    new CacheMongoRepository(collection, defaultExpireAfter, defaultCacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
 
   def create(collection: String, expireAfter: TimeToLive): CacheRepository =
+    new CacheMongoRepository(collection, expireAfter, defaultCacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
+
+  def create(collection: String, expireAfter: TimeToLive, cacheFormats: Format[Cache]): CacheRepository =
     new CacheMongoRepository(collection, expireAfter, cacheFormats)(reactiveMongoComponent.mongoConnector.db, executionContext)
 }
 
