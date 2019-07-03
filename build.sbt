@@ -14,12 +14,12 @@ val compileDependencies = PlayCrossCompilation.dependencies(
   play25 = Seq(
     "com.typesafe.play" %% "play"                 % play25 % "provided",
     "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.20.0-play-25",
-    "uk.gov.hmrc"       %% "http-verbs"           % "9.8.0-play-25"
+    "uk.gov.hmrc"       %% "http-verbs"           % "9.4.0-play-25"
   ),
   play26 = Seq(
     "com.typesafe.play" %% "play"                 % play26 % "provided",
     "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.20.0-play-26",
-    "uk.gov.hmrc"       %% "http-verbs"           % "9.8.0-play-26"
+    "uk.gov.hmrc"       %% "http-verbs"           % "9.4.0-play-26"
   )
 )
 
