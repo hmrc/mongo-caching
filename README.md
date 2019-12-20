@@ -4,7 +4,7 @@
 
 Micro-library containing functionality to cache generic data HTTP payloads into MongoDB
 
-**This library should not be used within microservices. Teams should use [simple-reactivemongo](https://github.com/hmrc/simple-reactivemongo) instead.**
+**This library should not be used within microservices [see this](https://confluence.tools.tax.service.gov.uk/display/Communities/Lead+Developer+Community). Teams should use [simple-reactivemongo](https://github.com/hmrc/simple-reactivemongo) instead.**
 
 ## Installing
 
