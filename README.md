@@ -4,6 +4,8 @@
 
 Micro-library containing functionality to cache generic data HTTP payloads into MongoDB
 
+** This library should not be used within microservices. Teams should use [simple-reactivemongo](https://github.com/hmrc/simple-reactivemongo) instead.**
+
 ## Installing
 
 Include the following dependency in your SBT build
