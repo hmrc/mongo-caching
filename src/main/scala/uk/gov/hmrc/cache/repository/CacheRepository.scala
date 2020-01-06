@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 HM Revenue & Customs
+ * Copyright 2020 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,9 @@ package uk.gov.hmrc.cache.repository
 import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
-import reactivemongo.api.commands.LastError
+import reactivemongo.api.commands.{FindAndModifyCommand, LastError}
 import reactivemongo.bson._
+import reactivemongo.play.json.JSONSerializationPack
 import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
@@ -60,7 +61,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
       implicit time =>
 
         withCurrentTime { time =>
-          def upsert: Future[JSONFindAndModifyCommand.FindAndModifyResult] = findAndUpdate(
+          def upsert: Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] = findAndUpdate(
             Json.obj(Id -> id.id),
             Json.obj(
               "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
@@ -72,7 +73,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
             case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
           }
 
-          def handleOutcome(outcome: JSONFindAndModifyCommand.FindAndModifyResult): Future[DatabaseUpdate[Cache]] = {
+          def handleOutcome(outcome: FindAndModifyCommand.Result[JSONSerializationPack.type]): Future[DatabaseUpdate[Cache]] = {
             (outcome.lastError, outcome.result[Cache]) match {
               case (Some(error), Some(value)) =>
                 val lastError = LastError(
