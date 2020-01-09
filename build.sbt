@@ -31,11 +31,11 @@ val testDependencies = PlayCrossCompilation.dependencies(
   ),
   play25 = Seq(
     "com.typesafe.play"      %% "play-test"          % play25              % "test",
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.15.0-play-25"     % "test"
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.16.0-play-25"     % "test"
   ),
   play26 = Seq(
     "com.typesafe.play"      %% "play-test"          % play26              % "test",
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.15.0-play-26"     % "test"
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.16.0-play-26"     % "test"
   )
 )
 
