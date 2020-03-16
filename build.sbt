@@ -9,33 +9,33 @@ val play26 = "2.6.23"
 
 val compileDependencies = PlayCrossCompilation.dependencies(
   shared = Seq(
-    "uk.gov.hmrc"       %% "time"               % "3.3.0"
+    "uk.gov.hmrc"       %% "time"               % "3.8.0"
   ),
   play25 = Seq(
     "com.typesafe.play" %% "play"                 % play25 % "provided",
-    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.22.0-play-25",
-    "uk.gov.hmrc"       %% "http-verbs"           % "9.4.0-play-25"
+    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.24.0-play-25",
+    "uk.gov.hmrc"       %% "http-verbs"           % "10.6.0-play-25"
   ),
   play26 = Seq(
     "com.typesafe.play" %% "play"                 % play26 % "provided",
-    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.22.0-play-26",
-    "uk.gov.hmrc"       %% "http-verbs"           % "9.4.0-play-26"
+    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.24.0-play-26",
+    "uk.gov.hmrc"       %% "http-verbs"           % "10.6.0-play-26"
   )
 )
 
 
 val testDependencies = PlayCrossCompilation.dependencies(
   shared = Seq(
-    "org.scalatest"     %% "scalatest"              % "3.0.5"             % "test",
-    "org.pegdown"       % "pegdown"                 % "1.6.0"             % "test"
+    "org.scalatest"     %% "scalatest"              % "3.0.5"             % Test,
+    "org.pegdown"       % "pegdown"                 % "1.6.0"             % Test
   ),
   play25 = Seq(
-    "com.typesafe.play"      %% "play-test"          % play25              % "test",
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.16.0-play-25"     % "test"
+    "com.typesafe.play"      %% "play-test"          % play25              % Test,
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.17.0-play-25"    % Test
   ),
   play26 = Seq(
-    "com.typesafe.play"      %% "play-test"          % play26              % "test",
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.16.0-play-26"     % "test"
+    "com.typesafe.play"      %% "play-test"          % play26              % Test,
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.17.0-play-26"    % Test
   )
 )
 
