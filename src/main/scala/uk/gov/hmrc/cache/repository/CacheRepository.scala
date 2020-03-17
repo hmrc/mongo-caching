@@ -39,8 +39,8 @@ trait CacheRepository extends ReactiveRepository[Cache, Id] with UniqueIndexViol
 
 @deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
 object CacheRepository extends MongoDbConnection {
-
-  def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository = new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
+  def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository =
+    new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
 }
 
 class CacheMongoRepository(collName: String, override val expireAfterSeconds: Long, cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)

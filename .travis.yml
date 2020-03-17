@@ -3,13 +3,16 @@ matrix:
   include:
     - scala: 2.11.12
       env: PLAY_VERSION=2.5
-      jdk: oraclejdk8
+      jdk: openjdk8
     - scala: 2.11.12
       env: PLAY_VERSION=2.6
-      jdk: oraclejdk8
-    - scala: 2.12.8
+      jdk: openjdk8
+    - scala: 2.12.10
       env: PLAY_VERSION=2.6
-      jdk: oraclejdk8
+      jdk: openjdk8
+    - scala: 2.12.10
+      env: PLAY_VERSION=2.7
+      jdk: openjdk8
 
 notifications:
   email:

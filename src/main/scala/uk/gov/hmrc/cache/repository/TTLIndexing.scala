@@ -31,21 +31,18 @@ trait TTLIndexing[A] {
   val expireAfterSeconds: Long
 
   private lazy val LastUpdatedIndex = "lastUpdatedIndex"
-  private lazy val OptExpireAfterSeconds = "expireAfterSeconds"
 
   override def ensureIndexes(implicit ec: ExecutionContext): Future[Seq[Boolean]] = {
     import reactivemongo.bson.DefaultBSONHandlers._
 
     val indexes = collection.indexesManager.list()
-    indexes.flatMap {
-      idxs => {
-        val idxToUpdate = idxs.find(index =>
-          index.eventualName == LastUpdatedIndex
-            && index.options.getAs[BSONLong](OptExpireAfterSeconds).getOrElse(BSONLong(expireAfterSeconds)).as[Long] != expireAfterSeconds)
+    indexes.flatMap { idxs =>
+      val idxToUpdate = idxs.find(index =>
+        index.eventualName == LastUpdatedIndex
+          && index.expireAfterSeconds.fold(false)(_ != expireAfterSeconds))
 
-        idxToUpdate.fold(ensureLastUpdated){ index =>
-          collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
-        }
+      idxToUpdate.fold(ensureLastUpdated){ index =>
+        collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
       }
     }
     Logger.info(s"Creating time to live for entries in ${collection.name} to $expireAfterSeconds seconds")
@@ -55,9 +52,27 @@ trait TTLIndexing[A] {
   private def ensureLastUpdated(implicit ec: ExecutionContext) = {
     Future.sequence(Seq(collection.indexesManager.ensure(
       Index(
-        key = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),
-        name = Some(LastUpdatedIndex),
-        options = BSONDocument(OptExpireAfterSeconds -> expireAfterSeconds)
+        key                = Seq("modifiedDetails.lastUpdated" -> IndexType.Ascending),
+        name               = Some(LastUpdatedIndex),
+        unique             = false,
+        background         = false,
+        sparse             = false,
+        expireAfterSeconds = Some(expireAfterSeconds.toInt),
+        storageEngine      = None,
+        weights            = None,
+        defaultLanguage    = None,
+        languageOverride   = None,
+        textIndexVersion   = None,
+        sphereIndexVersion = None,
+        bits               = None,
+        min                = None,
+        max                = None,
+        bucketSize         = None,
+        collation          = None,
+        wildcardProjection = None,
+        version            = None,
+        partialFilter      = None,
+        options            = BSONDocument.empty
       )
     )))
   }

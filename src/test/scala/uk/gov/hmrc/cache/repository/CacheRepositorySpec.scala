@@ -355,7 +355,6 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         (updated.data.get \ "form2").get shouldBe sampleFormData2Json
       }
     }
-
   }
 
   "KeyStoreMongoRepository" should {
@@ -363,15 +362,16 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
       val repository = repo("replaceIndex")
       val indexes = await(repository.collection.indexesManager.list())
       indexes.size shouldNot be(0)
-      val oldIndex = indexes.find(index => {
+      val oldIndex = indexes.find { index =>
         index.eventualName == "lastUpdatedIndex"
-      })
+      }
       oldIndex.isDefined shouldBe true
-      oldIndex.get.options.get("expireAfterSeconds").get shouldBe BSONLong(expireAfter28DaysInSeconds)
+      oldIndex.get.expireAfterSeconds shouldBe Some(expireAfter28DaysInSeconds)
       val modifiedRepository = repo("replaceIndex", 8888888)
       eventually {
-        val index = await(modifiedRepository.collection.indexesManager.list()).find(index => index.eventualName == "lastUpdatedIndex")
-        index.value.options.get("expireAfterSeconds").value shouldBe BSONLong(8888888)
+        val index = await(modifiedRepository.collection.indexesManager.list())
+                      .find(index => index.eventualName == "lastUpdatedIndex")
+        index.value.expireAfterSeconds shouldBe Some(8888888)
       }
     }
 
@@ -435,10 +435,9 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
                                                   |"form-field-address-one":"HMRC Road"
                                                   |}""".stripMargin)
 
-    lazy val sampleFormData2JsonDeltaOnlyUsername = Json.parse( """{
-    |"form-field-username":"Different Username"
-    }""".stripMargin)
-
+    lazy val sampleFormData2JsonDeltaOnlyUsername =
+      Json.parse( """{
+        |"form-field-username":"Different Username"
+        }""".stripMargin)
   }
-
 }
