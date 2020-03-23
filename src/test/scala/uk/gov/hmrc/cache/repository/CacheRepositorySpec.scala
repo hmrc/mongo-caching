@@ -366,12 +366,12 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         index.eventualName == "lastUpdatedIndex"
       }
       oldIndex.isDefined shouldBe true
-      oldIndex.get.expireAfterSeconds shouldBe Some(expireAfter28DaysInSeconds)
+      oldIndex.get.options.get("expireAfterSeconds") shouldBe Some(BSONLong(expireAfter28DaysInSeconds))
       val modifiedRepository = repo("replaceIndex", 8888888)
       eventually {
         val index = await(modifiedRepository.collection.indexesManager.list())
                       .find(index => index.eventualName == "lastUpdatedIndex")
-        index.value.expireAfterSeconds shouldBe Some(8888888)
+        index.value.options.get("expireAfterSeconds").value shouldBe BSONLong(8888888)
       }
     }
 
