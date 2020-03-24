@@ -13,17 +13,17 @@ val compileDependencies = PlayCrossCompilation.dependencies(
   ),
   play25 = Seq(
     "com.typesafe.play" %% "play"                 % play25Version    % Provided,
-    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.25.0-play-25",
+    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.26.0-play-25",
     "uk.gov.hmrc"       %% "http-verbs"           % "10.6.0-play-25"
   ),
   play26 = Seq(
     "com.typesafe.play" %% "play"                 % play26Version    % Provided,
-    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.25.0-play-26",
+    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.26.0-play-26",
     "uk.gov.hmrc"       %% "http-verbs"           % "10.6.0-play-26"
   ),
   play27 = Seq(
     "com.typesafe.play" %% "play"                 % play27Version    % Provided,
-    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.25.0-play-27",
+    "uk.gov.hmrc"       %% "simple-reactivemongo" % "7.26.0-play-27",
     "uk.gov.hmrc"       %% "http-verbs"           % "10.6.0-play-27"
   )
 )
@@ -36,15 +36,15 @@ val testDependencies = PlayCrossCompilation.dependencies(
   ),
   play25 = Seq(
     "com.typesafe.play"      %% "play-test"          % play25Version       % Test,
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.18.0-play-25"    % Test
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.19.0-play-25"    % Test
   ),
   play26 = Seq(
     "com.typesafe.play"      %% "play-test"          % play26Version       % Test,
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.18.0-play-26"    % Test
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.19.0-play-26"    % Test
   ),
   play27 = Seq(
     "com.typesafe.play"      %% "play-test"          % play27Version       % Test,
-    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.18.0-play-27"    % Test
+    "uk.gov.hmrc"            %% "reactivemongo-test" % "4.19.0-play-27"    % Test
   )
 )
 
