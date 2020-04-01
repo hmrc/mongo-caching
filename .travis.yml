@@ -14,9 +14,6 @@ matrix:
       env: PLAY_VERSION=2.7
       jdk: openjdk8
 
-cache:
-  directories:
-    - '$HOME/.ivy2/cache'
 services:
   - mongodb
 addons:
