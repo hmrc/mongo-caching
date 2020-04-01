@@ -26,7 +26,7 @@ abstract class WordSpecLikeWithRetries extends WordSpecLike with Retries {
   protected[this] val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   // Number of times to rerun the test before giving up
-  val retries = 5
+  val retries = 20
 
   override def withFixture(test: NoArgTest): Outcome = {
     if (isRetryable(test)) withFixture(test, retries) else super.withFixture(test)
