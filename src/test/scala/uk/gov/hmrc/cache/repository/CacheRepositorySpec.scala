@@ -16,16 +16,21 @@
 
 package uk.gov.hmrc.cache.repository
 
+import org.joda.time.DateTime
+import org.scalacheck.Arbitrary._
+import org.scalatest._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import org.scalatest.{BeforeAndAfterEach, Matchers, OptionValues, WordSpecLike}
-import play.api.libs.json.Json
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
+import org.scalatest.tagobjects.Retryable
+import play.api.libs.json.{JsResultException, Json}
 import reactivemongo.bson.{BSONLong, BSONObjectID}
+import uk.gov.hmrc.cache.WordSpecLikeWithRetries
 import uk.gov.hmrc.cache.model.{Cache, Id}
-import uk.gov.hmrc.mongo.{DatabaseUpdate, MongoSpecSupport, Saved, Updated}
+import uk.gov.hmrc.mongo.{MongoSpecSupport, Saved, Updated}
 
 
-class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSupport with BeforeAndAfterEach
-  with Eventually with OptionValues with IntegrationPatience with ScalaFutures {
+class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with MongoSpecSupport with BeforeAndAfterEach
+  with Eventually with OptionValues with IntegrationPatience with ScalaFutures with GeneratorDrivenPropertyChecks {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
@@ -34,7 +39,6 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
   implicit val defaultTimeout = 5 seconds
 
   def await[A](future: Future[A])(implicit timeout: Duration) = Await.result(future, timeout)
-
 
   private val expireAfter28DaysInSeconds = 60 * 60 * 24 * 7 * 4
 
@@ -107,19 +111,40 @@ class CacheRepositorySpec extends WordSpecLike with Matchers with MongoSpecSuppo
         (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
       }
 
-      "handle parallel processing - race condition" in new TestSetup {
+      // See the comment in Cache Repository for more context on this test and the one below
+      // This test is tagged as Retryable and will be attempted a few times, as the race condition isn't triggered always,
+      // but can be quite easily reproduced over a number of iterations
+      "handle parallel processing - expect to trigger race condition when no recovery is present" taggedAs Retryable in new TestSetup {
         val repository = repo("simpledata")
-        val id: Id = "numberId"
-        val jsonNumber = Json.toJson(123)
+        val id: Id = "id_" + arbitrary[Long].sample.get.toString //Use a random ID
+        val jsonNumber = Json.toJson(arbitrary[Long].sample.get)
 
-        Future.sequence(
-          (0 to 100).par.map(_ => repository.createOrUpdate(id, "form1", jsonNumber)).toList
-        ).futureValue
+        val expectedToFail = Future.sequence(
+          (0 to 500).par.map(_ => repository.upsertMayFail(id, "form1", jsonNumber)(DateTime.now)).toList
+        )
 
-        val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
-        unsetCheck.updateType shouldBe a[Updated[_]]
-        val updateCheck = await(repository.findById(id)).get
-        (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
+        whenReady(expectedToFail.failed) { f =>
+          f shouldBe an [JsResultException]
+          assert(f.getMessage.contains("E11000 duplicate key error collection"))
+        }
+      }
+
+      // See the comment in Cache Repository for more context on this test and the one above
+      "handle parallel processing - expect no race condition when using recovery" in new TestSetup {
+        forAll(arbitrary[Long]) { l => //Try many times with arbitrary different values. Should never fail with the race condition
+          val repository = repo("simpledata")
+          val id: Id = "numberId"
+          val jsonNumber = Json.toJson(l)
+
+          Future.sequence(
+            (0 to 500).par.map(_ => repository.createOrUpdate(id, "form1", jsonNumber)).toList
+          ).futureValue
+
+          val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+          unsetCheck.updateType shouldBe a[Updated[_]]
+          val updateCheck = await(repository.findById(id)).get
+          (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
+        }
       }
 
       "write and read JsValue type JsNumber Double" in new TestSetup {

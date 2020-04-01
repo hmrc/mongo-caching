@@ -32,7 +32,9 @@ val compileDependencies = PlayCrossCompilation.dependencies(
 val testDependencies = PlayCrossCompilation.dependencies(
   shared = Seq(
     "org.scalatest"     %% "scalatest"              % "3.0.5"             % Test,
-    "org.pegdown"       % "pegdown"                 % "1.6.0"             % Test
+    "org.scalacheck"    %% "scalacheck"             % "1.14.0"            % Test,
+    "org.pegdown"       % "pegdown"                 % "1.6.0"             % Test,
+    "org.slf4j"         % "slf4j-simple"            % "1.7.30"            % Test
   ),
   play25 = Seq(
     "com.typesafe.play"      %% "play-test"          % play25Version       % Test,
@@ -57,7 +59,7 @@ lazy val mongoCache = Project(libName, file("."))
       scalaVersion := "2.11.12",
       libraryDependencies ++= compileDependencies ++ testDependencies,
       resolvers := Seq(
-        "typesafe-releases" at "http://repo.typesafe.com/typesafe/releases/",
+        "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/",
         Resolver.bintrayRepo("hmrc", "releases"),
         Resolver.jcenterRepo
       ),

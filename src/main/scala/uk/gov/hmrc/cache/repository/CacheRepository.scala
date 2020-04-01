@@ -16,13 +16,14 @@
 
 package uk.gov.hmrc.cache.repository
 
+import org.joda.time.DateTime
+import play.api.data.validation.ValidationError
 import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
 import reactivemongo.api.commands.{FindAndModifyCommand, LastError}
 import reactivemongo.bson._
 import reactivemongo.play.json.JSONSerializationPack
-import reactivemongo.play.json.commands.{DefaultJSONCommandError, JSONFindAndModifyCommand}
 import uk.gov.hmrc.cache.model.{Cache, Id}
 import uk.gov.hmrc.mongo._
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
@@ -48,61 +49,79 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
     with CacheRepository with TTLIndexing[Cache]
     with BSONBuilderHelpers {
 
-
   final val AtomicId = "atomicId"
   final val Id = "_id"
 
   import ReactiveMongoFormats._
 
+  // It is possible with MongoDB to have a duplicate key violation when trying to upsert, if two or more threads try the operation concurrently: https://jira.mongodb.org/browse/SERVER-14322
+  // Clients are expected to handle this appropriately. This library previously caught this error (E11000) and retried continually in the event it was detected.
+  //
+  // With a recent change to reactivemongo and reactivemongo-play-json, the error is wrapped up as a JsResultException instead.
+  // The test that verified the exception was not thrown after simulated heavy load was then always giving false positives, as the
+  // specific exception it was catching was never thrown.
+  //
+  // To avoid this happening again, we have added a test that specifically checks that the expected exception is thrown doing the upsert
+  // without any recovery. To facilitate this, the upsert has been broken down into two pieces. This method, which will fail with the race condition,
+  // and the method inside createOrUpdate below, which handles the recovery.
+  //
+  //
+  // See https://groups.google.com/forum/?fromgroups#!searchin/reactivemongo/JsResultException/reactivemongo/0vIVvi-T4jA/4Xc_G5tQAgAJ
+  // and https://jira.tools.tax.service.gov.uk/browse/BDOG-731
+  // for more context
+  private[repository] def upsertMayFail(id: Id, key: String, toCache: JsValue)(implicit time: DateTime): Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] = findAndUpdate(
+    Json.obj(Id -> id.id),
+    Json.obj(
+      "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
+      "$setOnInsert" -> Json.obj("modifiedDetails.createdAt" -> time, Id -> id.id, AtomicId -> BSONObjectID.generate())
+    ),
+    upsert = true,
+    fetchNewObject = true
+  )
+
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
-    withCurrentTime {
+    withCurrentTime { implicit time =>
 
-      implicit time =>
+      // In order to preserve the existing behavior, the ugly recovery fix has been kept as is, but updated to check the
+      // JsResultException.
+      // Code E11000 is the mongo code for a duplicate key violation
+      def upsert: Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] =
+      upsertMayFail(id, key, toCache).recoverWith {
+        case JsResultException((_, ValidationError(s :: _) :: _) :: _) if s matches ".*code=11000[^\\w\\d].*" =>
+          logger.debug("Detected an E11000 duplicate key violation. Retrying upsert")
+          upsertMayFail(id, key, toCache)
+      }
 
-        withCurrentTime { time =>
-          def upsert: Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] = findAndUpdate(
-            Json.obj(Id -> id.id),
-            Json.obj(
-              "$set" -> Json.obj(s"${Cache.DATA_ATTRIBUTE_NAME}.$key" -> toCache, "modifiedDetails.lastUpdated" -> time),
-              "$setOnInsert" -> Json.obj("modifiedDetails.createdAt" -> time, Id -> id.id, AtomicId -> BSONObjectID.generate())
-            ),
-            upsert = true,
-            fetchNewObject = true
-          ).recoverWith {
-            case e: DefaultJSONCommandError if e.code.contains(11000) => upsert
-          }
-
-          def handleOutcome(outcome: FindAndModifyCommand.Result[JSONSerializationPack.type]): Future[DatabaseUpdate[Cache]] = {
-            (outcome.lastError, outcome.result[Cache]) match {
-              case (Some(error), Some(value)) =>
-                val lastError = LastError(
-                  ok                = true,
-                  errmsg            = None,
-                  code              = None,
-                  lastOp            = None,
-                  n                 = error.n,
-                  singleShard       = None,
-                  updatedExisting   = error.updatedExisting,
-                  upserted          = None,
-                  wnote             = None,
-                  wtimeout          = false,
-                  waited            = None,
-                  wtime             = None,
-                  writeErrors       = Nil,
-                  writeConcernError = None
-                )
-                if (error.updatedExisting) {
-                  Future.successful(DatabaseUpdate(lastError, Updated(value, value)))
-                } else {
-                  Future.successful(DatabaseUpdate(lastError, Saved(value)))
-                }
-              case _ => throw new EntityNotFoundException("Failed to receive updated object!")
+      def handleOutcome(outcome: FindAndModifyCommand.Result[JSONSerializationPack.type]): Future[DatabaseUpdate[Cache]] = {
+        (outcome.lastError, outcome.result[Cache]) match {
+          case (Some(error), Some(value)) =>
+            val lastError = LastError(
+              ok = true,
+              errmsg = None,
+              code = None,
+              lastOp = None,
+              n = error.n,
+              singleShard = None,
+              updatedExisting = error.updatedExisting,
+              upserted = None,
+              wnote = None,
+              wtimeout = false,
+              waited = None,
+              wtime = None,
+              writeErrors = Nil,
+              writeConcernError = None
+            )
+            if (error.updatedExisting) {
+              Future.successful(DatabaseUpdate(lastError, Updated(value, value)))
+            } else {
+              Future.successful(DatabaseUpdate(lastError, Saved(value)))
             }
-          }
-
-          upsert.flatMap(handleOutcome)
+          case _ => throw new EntityNotFoundException("Failed to receive updated object!")
         }
+      }
+
+      upsert.flatMap(handleOutcome)
     }
   }
 }
