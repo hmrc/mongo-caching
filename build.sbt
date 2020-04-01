@@ -1,5 +1,6 @@
 import sbt.Keys._
 import sbt._
+import uk.gov.hmrc.playcrosscompilation.PlayVersion.Play25
 
 val libName = "mongo-caching"
 
@@ -55,12 +56,13 @@ lazy val mongoCache = Project(libName, file("."))
     .settings(
       majorVersion := 6,
       makePublicallyAvailableOnBintray := true,
-      scalaVersion := "2.11.12",
-      libraryDependencies ++= compileDependencies ++ testDependencies,
-      resolvers := Seq(
-        "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/",
-        Resolver.bintrayRepo("hmrc", "releases"),
-        Resolver.jcenterRepo
-      ),
-      crossScalaVersions := Seq("2.11.12", "2.12.10")
+      // Only use 2.11 if we're doing a Play25 build, as it does not support 2.12
+      scalaVersion := (if(PlayCrossCompilation.playVersion == Play25) "2.11.12" else "2.12.10"),
+      crossScalaVersions := Seq("2.11.12", "2.12.10"),
+        libraryDependencies ++= compileDependencies ++ testDependencies,
+        resolvers := Seq(
+          "typesafe-releases" at "https://repo.typesafe.com/typesafe/releases/",
+          Resolver.bintrayRepo("hmrc", "releases"),
+          Resolver.jcenterRepo
+      )
     ).settings(PlayCrossCompilation.playCrossCompilationSettings)
