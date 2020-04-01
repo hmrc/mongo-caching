@@ -17,7 +17,6 @@
 package uk.gov.hmrc.cache.repository
 
 import org.joda.time.DateTime
-import play.api.data.validation.ValidationError
 import play.api.libs.json._
 import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
@@ -65,7 +64,6 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
   // without any recovery. To facilitate this, the upsert has been broken down into two pieces. This method, which will fail with the race condition,
   // and the method inside createOrUpdate below, which handles the recovery.
   //
-  //
   // See https://groups.google.com/forum/?fromgroups#!searchin/reactivemongo/JsResultException/reactivemongo/0vIVvi-T4jA/4Xc_G5tQAgAJ
   // and https://jira.tools.tax.service.gov.uk/browse/BDOG-731
   // for more context
@@ -81,16 +79,27 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
 
   override def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = {
 
+    // Determine whether an E11000 exception was found
+    def hasDupeKeyViolation(ex: JsResultException) = (for {
+      validationErrors <- ex.errors.flatMap(_._2)
+      message <- validationErrors.messages
+      dupeKey = message matches ".*code=11000[^\\w\\d].*"
+    } yield dupeKey).contains(true)
+
     withCurrentTime { implicit time =>
 
       // In order to preserve the existing behavior, the ugly recovery fix has been kept as is, but updated to check the
       // JsResultException.
       // Code E11000 is the mongo code for a duplicate key violation
-      def upsert: Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] =
-      upsertMayFail(id, key, toCache).recoverWith {
-        case JsResultException((_, ValidationError(s :: _) :: _) :: _) if s matches ".*code=11000[^\\w\\d].*" =>
-          logger.debug("Detected an E11000 duplicate key violation. Retrying upsert")
-          upsertMayFail(id, key, toCache)
+      def upsert(retries: Int = 3): Future[FindAndModifyCommand.Result[JSONSerializationPack.type]] = {
+        val attempt = upsertMayFail(id, key, toCache)
+
+        if (retries <= 1) attempt
+        else attempt.recoverWith {
+          case e: JsResultException if hasDupeKeyViolation(e) =>
+            logger.debug(s"Detected an E11000 duplicate key violation. Retrying upsert. Attempts left: $retries")
+            upsert(retries - 1)
+        }
       }
 
       def handleOutcome(outcome: FindAndModifyCommand.Result[JSONSerializationPack.type]): Future[DatabaseUpdate[Cache]] = {
@@ -121,7 +130,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
         }
       }
 
-      upsert.flatMap(handleOutcome)
+      upsert().flatMap(handleOutcome)
     }
   }
 }
