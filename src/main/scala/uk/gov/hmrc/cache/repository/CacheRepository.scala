@@ -83,7 +83,7 @@ class CacheMongoRepository(collName: String, override val expireAfterSeconds: Lo
     def hasDupeKeyViolation(ex: JsResultException) = (for {
       validationErrors <- ex.errors.flatMap(_._2)
       message <- validationErrors.messages
-      dupeKey = message matches ".*code=11000[^\\w\\d].*"
+      dupeKey = message.matches(".*code=11000[^\\w\\d].*")
     } yield dupeKey).contains(true)
 
     withCurrentTime { implicit time =>
