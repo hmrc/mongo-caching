@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/hmrc/mongo-caching.svg?branch=master)](https://travis-ci.org/hmrc/mongo-caching) [ ![Download](https://api.bintray.com/packages/hmrc/releases/mongo-caching/images/download.svg) ](https://bintray.com/hmrc/releases/mongo-caching/_latestVersion)
 
-Micro-library containing functionality to cache generic data HTTP payloads into MongoDB
+Micro-library containing functionality to cache generic JSON data in MongoDB
 
 ## Installing
 
@@ -16,6 +16,47 @@ libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "[INSERT_VERSION]"
 For Java 7 use a version <= 0.7.1
 
 For Play 2.7, it requires `play.allowGlobalApplication = true` in application.conf.
+
+## Usage
+
+The library comprises two central classes, `CacheMongoRepository`, and `CacheController`.
+
+Most use-cases should use the `CacheMongoRepository` unless you have a concrete need to expose your cache via HTTP. The Controller class wraps the Repository class in a Play Controller, and can be wired directly into a `routes` file.
+
+Example usage of `CacheMongoRepository` in Scala:
+
+```scala
+@Singleton
+class SessionCacheRepository @Inject()(
+  @Named("mongodb.session.expireAfterSeconds") expireAfterSeconds: Int,
+  mongo: ReactiveMongoComponent)(implicit ec: ExecutionContext)
+    extends CacheMongoRepository("sessions", expireAfterSeconds)(mongo.mongoConnector.db, ec)
+```
+
+This creates a repository class, which can be called from elsewhere in your application. You should only create this class on application start-up, rather than dynamically calling `new`, as the class constructor will check for, and optionally create, database indexes.
+
+The `CacheMongoRepository` class exposes a method `createOrUpdate` that is used to upsert data into the cache.
+
+```scala
+def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]]
+```
+
+Data inserted using this method has a time-to-live (TTL) that applies per `Id`. The amount of time is configured when creating the class; `expireAfterSeconds` in our example. Any modifications of data for an `Id` will reset the TTL.
+
+The JSON structure that is cached in Mongo:
+
+```json
+{
+	"id": {
+		"key1": "value1",
+		"key2": "value1"
+	}
+}
+```
+
+This structure allows caching multiple keys against an ID. As cached values expire per ID, this provides a way to expire related data at the same time.
+
+Simpler use-cases for this library can hardcode `key` to a constant, and provide a cache of ID to value.
 
 ## License ##
 
