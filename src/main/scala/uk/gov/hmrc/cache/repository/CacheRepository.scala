@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package uk.gov.hmrc.cache.repository
 
 import org.joda.time.DateTime
 import play.api.libs.json._
-import play.modules.reactivemongo.MongoDbConnection
 import reactivemongo.api.DB
 import reactivemongo.api.commands.{FindAndModifyCommand, LastError}
 import reactivemongo.bson._
@@ -35,12 +34,6 @@ trait CacheRepository extends ReactiveRepository[Cache, Id] with UniqueIndexViol
   def createOrUpdate(id: Id, key: String, toCache: JsValue): Future[DatabaseUpdate[Cache]] = ???
 
   protected def saveOrUpdate(findQuery: => Future[Option[Cache]], ifNotFound: => Future[Cache], modifiers: (Cache) => Cache)(implicit ec: ExecutionContext): Future[DatabaseUpdate[Cache]] = ???
-}
-
-@deprecated("Please use injected CacheMongoRepository to your class", since = "6.x")
-object CacheRepository extends MongoDbConnection {
-  def apply(collectionNameProvidedBySource: String, expireAfterSeconds: Long, cacheFormats: Format[Cache])(implicit ec: ExecutionContext): CacheRepository =
-    new CacheMongoRepository(collectionNameProvidedBySource, expireAfterSeconds, cacheFormats)
 }
 
 class CacheMongoRepository(collName: String, override val expireAfterSeconds: Long, cacheFormats: Format[Cache] = Cache.mongoFormats)(implicit mongo: () => DB, ec: ExecutionContext)

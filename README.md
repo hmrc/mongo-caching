@@ -15,7 +15,16 @@ libraryDependencies += "uk.gov.hmrc" %% "mongo-caching" % "[INSERT_VERSION]"
 ```
 For Java 7 use a version <= 0.7.1
 
-For Play 2.7, it requires `play.allowGlobalApplication = true` in application.conf.
+## Migration
+
+### 7.x.x
+
+Supports Play 2.6, 2.7, 2.8 (Scala 2.12)
+
+* `CacheController` has been removed. The code (from v6.x.x) can be included in the client service if required.
+* The deprecated `CacheRepository` has been removed. Use `CacheMongoRepository` instead.
+* `play.allowGlobalApplication = true` is no longer required in your application.conf to use this library.
+
 
 ## Usage
 

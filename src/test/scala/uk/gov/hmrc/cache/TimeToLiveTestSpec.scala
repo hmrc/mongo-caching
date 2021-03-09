@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,23 @@
 
 package uk.gov.hmrc.cache
 
-import org.scalatest.Matchers._
-import org.scalatest.WordSpecLike
-import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.test.Helpers.running
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
+import com.typesafe.config.{Config, ConfigFactory}
 
-class TimeToLiveTestSpec extends WordSpecLike {
+class TimeToLiveTestSpec extends AnyWordSpecLike with Matchers {
 
   "TimeToLive" should {
     "yield the default value when there is no config to read " in {
-      running(new GuiceApplicationBuilder().build()) {
-        val ttl = new TimeToLive {}
-        ttl.defaultExpireAfter shouldBe 300
-      }
+      val ttl = new TimeToLive {}
+      ttl.defaultExpireAfter shouldBe 300
     }
 
     "read the 'cache.expiryInMinutes' config value " in {
-      val conf = Map("cache.expiryInMinutes" -> "6")
-      running(new GuiceApplicationBuilder().configure(conf).build()) {
-        val ttl = new TimeToLive {}
-        ttl.defaultExpireAfter shouldBe 360
+      val ttl = new TimeToLive {
+        override private[cache] def config: Config = ConfigFactory.parseString("cache.expiryInMinutes: 6")
       }
+      ttl.defaultExpireAfter shouldBe 360
     }
   }
 }

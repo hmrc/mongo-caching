@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ import java.util.concurrent.Executors
 
 import org.joda.time.DateTime
 import org.scalacheck.Arbitrary._
-import org.scalatest._
+import org.scalatest.{AppendedClues, BeforeAndAfterEach, EitherValues, OptionValues}
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.tagobjects.Retryable
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.{JsResultException, Json}
 import reactivemongo.api.ReadPreference
 import reactivemongo.bson.{BSONLong, BSONObjectID}
@@ -35,48 +36,49 @@ import scala.collection.parallel.ExecutionContextTaskSupport
 import scala.concurrent.ExecutionContext
 
 
-class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with MongoSpecSupport with BeforeAndAfterEach
-  with Eventually with OptionValues with IntegrationPatience with ScalaFutures with GeneratorDrivenPropertyChecks with AppendedClues {
+class CacheRepositorySpec
+  extends WordSpecLikeWithRetries
+     with Matchers
+     with MongoSpecSupport
+     with BeforeAndAfterEach
+     with OptionValues
+     with EitherValues
+     with ScalaFutures
+     with Eventually
+     with IntegrationPatience
+     with ScalaCheckPropertyChecks
+     with AppendedClues {
 
   import scala.concurrent.ExecutionContext.Implicits.global
-  import scala.concurrent.duration._
-  import scala.concurrent.{Await, Future}
-
-  implicit val defaultTimeout = 5 seconds
-
-  def await[A](future: Future[A])(implicit timeout: Duration) = Await.result(future, timeout)
+  import scala.concurrent.Future
 
   private val expireAfter28DaysInSeconds = 60 * 60 * 24 * 7 * 4
 
   private def repo(name: String, expiresAfter: Long = expireAfter28DaysInSeconds) = new CacheMongoRepository(name, expiresAfter) {
-    await(super.ensureIndexes)
+    super.ensureIndexes.futureValue
   }
 
   override protected def beforeEach() = {
-    await(mongoConnectorForTest.db().drop)
+    mongoConnectorForTest.db().drop.futureValue
   }
 
   "create or update" should {
-
     "create" should {
-
       "insert a new record" in new TestSetup {
         val repository = repo("updateDataByKey")
         val id: Id = new Id("createMeId")
 
-        val notFound = await(repository.findById(id))
+        val notFound = repository.findById(id).futureValue
         notFound shouldBe None
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "form1", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a [Saved[_]]
 
-        val original = await(repository.findById(id)).get
+        val original = repository.findById(id).futureValue.value
 
         original.id shouldBe id
-        Option(original.modifiedDetails.createdAt) shouldBe defined
-        Option(original.modifiedDetails.lastUpdated) shouldBe defined
-        Option(original.atomicId.get) shouldBe defined
-        (original.data.get \ "form1").get shouldBe sampleFormData1Json
+        original.atomicId shouldBe defined
+        (original.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
       }
     }
 
@@ -86,15 +88,15 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
 
         val id: Id = "deleteMeId"
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "form1", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a [Saved[_]]
 
-        val original = await(repository.findById(id)).get
+        val original = repository.findById(id).futureValue.value
         original.id shouldBe id
-        (original.data.get \ "form1").get shouldBe sampleFormData1Json
+        (original.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
 
-        await(repository.removeById(id))
-        val removed = await(repository.findById(id))
+        repository.removeById(id).futureValue
+        val removed = repository.findById(id).futureValue
         removed should be(empty)
       }
     }
@@ -106,15 +108,15 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "numberId"
         val jsonNumber = Json.toJson(123)
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonNumber))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonNumber).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonNumber
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonNumber
 
-        val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+        val unsetCheck = repository.createOrUpdate(id, "form1", Json.parse("{}")).futureValue
         unsetCheck.updateType shouldBe a[Updated[_]]
-        val updateCheck = await(repository.findById(id)).get
-        (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
+        val updateCheck = repository.findById(id).futureValue.value
+        (updateCheck.data.value \ "form1").toEither.right.value shouldBe emptyJsonObject
       }
 
       // See the comment in Cache Repository for more context on this test and the one below
@@ -122,8 +124,8 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
       // but can be quite easily reproduced over a number of iterations
       "handle parallel processing - expect to trigger race condition when no recovery is present" taggedAs Retryable in new TestSetup {
         val repository = repo("simpledata")
-        val id: Id = "id_" + arbitrary[Long].sample.get.toString //Use a random ID
-        val jsonNumber = Json.toJson(arbitrary[Long].sample.get)
+        val id: Id = "id_" + arbitrary[Long].sample.value.toString //Use a random ID
+        val jsonNumber = Json.toJson(arbitrary[Long].sample.value)
 
         val fixedPool = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(50)) //Use a lot of threads
         val taskSupport = new ExecutionContextTaskSupport(fixedPool)
@@ -156,10 +158,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
             parRange.map(_ => repository.createOrUpdate(id, "form1", jsonNumber)).toList
           }(implicitly, executor = fixedPool).futureValue
 
-          val unsetCheck = await(repository.createOrUpdate(id, "form1", Json.parse("{}")))
+          val unsetCheck = repository.createOrUpdate(id, "form1", Json.parse("{}")).futureValue
           unsetCheck.updateType shouldBe a[Updated[_]]
-          val updateCheck = await(repository.findById(id, ReadPreference.Primary)).get
-          (updateCheck.data.get \ "form1").get shouldBe emptyJsonObject
+          val updateCheck = repository.findById(id, ReadPreference.Primary).futureValue.value
+          (updateCheck.data.value \ "form1").toEither.right.value shouldBe emptyJsonObject
         }
       }
 
@@ -168,11 +170,11 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "numberDoubleId"
         val jsonNumber = Json.toJson(999.99)
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonNumber))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonNumber).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
+        val original = repository.findById(id).futureValue.value
 
-        (original.data.get \ "form1").get shouldBe jsonNumber
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonNumber
       }
 
       "write and read JsValue type JsString" in new TestSetup {
@@ -180,10 +182,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "stringId"
         val jsonString = Json.toJson("some simple string")
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonString))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonString).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonString
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonString
       }
 
       "write and read JsValue type JsBoolean" in new TestSetup {
@@ -191,10 +193,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "booleanId"
         val jsonBoolean = Json.toJson(true)
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonBoolean))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonBoolean).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonBoolean
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonBoolean
       }
 
       "write and read JsValue type JsArray Integer" in new TestSetup {
@@ -202,10 +204,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "arrayIntId"
         val jsonArray = Json.toJson(List(1,2,3,4))
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonArray).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original: Cache = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonArray
+        val original: Cache = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonArray
       }
 
       "write and read JsValue type JsArray String" in new TestSetup {
@@ -213,10 +215,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "arrayStringId"
         val jsonArray = Json.toJson(List("apple","pear","orange"))
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonArray).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonArray
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonArray
       }
 
       "write and read JsValue type JsArray Double" in new TestSetup {
@@ -224,10 +226,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val id: Id = "arrayDoubleId"
         val jsonArray = Json.toJson(List(123.11,456.22,789.33))
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonArray).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonArray
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonArray
       }
 
       "write and read a JsValue type JsArray user-defined" in new TestSetup {
@@ -241,10 +243,10 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
 
         val jsonArray = Json.toJson(List(UserDefined("1","2",3, List(SubUserDefined("b"),SubUserDefined("cb"))),UserDefined("4","5",6,List(SubUserDefined("d")))))
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", jsonArray))
+        val insertCheck = repository.createOrUpdate(id, "form1", jsonArray).futureValue
         insertCheck.updateType shouldBe a[Saved[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "form1").get shouldBe jsonArray
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "form1").toEither.right.value shouldBe jsonArray
       }
 
       "Saving a key with empty json will create a mongo record with no data attribute, " +
@@ -253,14 +255,14 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val repository = repo("simpledata")
         val id: Id = "unsetId"
 
-        await(repository.createOrUpdate(id, "searched-person", Json.parse("{}")))
-        val shouldHaveNoData = await(repository.findById(id)).get
-        (shouldHaveNoData.data.get  \ "searched-person").get  shouldBe Json.parse("{}")
+        repository.createOrUpdate(id, "searched-person", Json.parse("{}")).futureValue
+        val shouldHaveNoData = repository.findById(id).futureValue.value
+        (shouldHaveNoData.data.value  \ "searched-person").toEither.right.value  shouldBe Json.parse("{}")
 
-        val insertCheck = await(repository.createOrUpdate(id, "searched-person", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "searched-person", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a[Updated[_]]
-        val original = await(repository.findById(id)).get
-        (original.data.get \ "searched-person").get shouldBe sampleFormData1Json
+        val original = repository.findById(id).futureValue.value
+        (original.data.value \ "searched-person").toEither.right.value shouldBe sampleFormData1Json
       }
 
       "once a record has been created, allow new records associated with the same key to be created and updated within a single operation" in new TestSetup {
@@ -268,25 +270,25 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val repository = repo("updateDataByKey")
         val id: Id = "updateMeId"
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "form1", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a [Saved[_]]
-        val original = await(repository.findById(id)).get
+        val original = repository.findById(id).futureValue.value
 
-        val updateCheck = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        val updateCheck = repository.createOrUpdate(id, "form2", sampleFormData2Json).futureValue
         updateCheck.updateType shouldBe a [Updated[_]]
 
-        val updated = await(repository.findById(id)).get
+        val updated = repository.findById(id).futureValue.value
         updated.id shouldBe original.id
         updated.modifiedDetails.createdAt shouldBe original.modifiedDetails.createdAt
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
 
-        (updated.data.get \ "form1").get shouldBe sampleFormData1Json
-        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
+        (updated.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
+        (updated.data.value \ "form2").toEither.right.value shouldBe sampleFormData2Json
 
-        await(repository.createOrUpdate(id, "form2", sampleFormData2JsonA))
-        val updated2 = await(repository.findById(id)).get
-        (updated2.data.get \ "form1").get shouldBe sampleFormData1Json
-        (updated2.data.get \ "form2").get shouldBe sampleFormData2JsonA
+        repository.createOrUpdate(id, "form2", sampleFormData2JsonA).futureValue
+        val updated2 = repository.findById(id).futureValue.value
+        (updated2.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
+        (updated2.data.value \ "form2").toEither.right.value shouldBe sampleFormData2JsonA
       }
     }
 
@@ -297,75 +299,69 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val repository = repo("updateLegacy")
         val id: Id = "updateLegacyId"
 
-        await(repository.insert(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))))
+        repository.insert(Cache(id, Some(Json.obj("form1" -> sampleFormData1Json)))).futureValue
 
-        val original = await(repository.findById(id)).get
+        val original = repository.findById(id).futureValue.value
         original.atomicId shouldBe None
 
-        val updateCheck = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        val updateCheck = repository.createOrUpdate(id, "form2", sampleFormData2Json).futureValue
         updateCheck.updateType shouldBe a [Updated[_]]
 
-        val updated = await(repository.findById(id)).get
+        val updated = repository.findById(id).futureValue.value
         updated.atomicId shouldBe None
 
         updated.id shouldBe original.id
         updated.modifiedDetails.lastUpdated should not be original.modifiedDetails.lastUpdated
 
-        (updated.data.get \ "form1").get shouldBe sampleFormData1Json
-        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
+        (updated.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
+        (updated.data.value \ "form2").toEither.right.value shouldBe sampleFormData2Json
       }
-
     }
 
     "inserting a new key which contains an empty JsValue " should {
-
       "create a new record with a key with an empty Json object" in new TestSetup {
-
         val repository = repo("emptyJSValue")
         val id: Id = "testEmptyJsValueId"
 
-        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
+        val updateCheck = repository.createOrUpdate(id, "form1", emptyJsonObject).futureValue
         updateCheck.updateType shouldBe a [Saved[_]]
 
-        val original = await(repository.findById(id)).get
-        original.atomicId.get shouldBe a [BSONObjectID]
+        val original = repository.findById(id).futureValue.value
+        original.atomicId.value shouldBe a [BSONObjectID]
 
-        (original.data.get \ "form1").get shouldBe emptyJsonObject
+        (original.data.value \ "form1").toEither.right.value shouldBe emptyJsonObject
       }
     }
 
     "applying empty optional fields to an existing fully populated form" should {
-
       "not set the optional fields" in new TestSetup {
-
         val repository = repo("unsetJSValue")
         val id: Id = "testClearJsValueIdA"
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "form1", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a [Saved[_]]
 
-        val original = await(repository.findById(id)).get
-        original.atomicId.get shouldBe a [BSONObjectID]
-        (original.data.get \ "form1").get shouldBe sampleFormData1Json
+        val original = repository.findById(id).futureValue.value
+        original.atomicId.value shouldBe a [BSONObjectID]
+        (original.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
 
         // Verify optional fields can be removed.
-        val attributeRemoval = await(repository.createOrUpdate(id, "form1", sampleFormData1Json2))
+        val attributeRemoval = repository.createOrUpdate(id, "form1", sampleFormData1Json2).futureValue
         attributeRemoval.updateType shouldBe a [Updated[_]]
 
-        val checkAttributeRemoval = await(repository.findById(id)).get
-        checkAttributeRemoval.atomicId.get shouldBe a [BSONObjectID]
-        (checkAttributeRemoval.data.get \ "form1").get shouldBe sampleFormData1Json2
+        val checkAttributeRemoval = repository.findById(id).futureValue.value
+        checkAttributeRemoval.atomicId.value shouldBe a [BSONObjectID]
+        (checkAttributeRemoval.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json2
 
         // Verify complete object can be emptied.
-        val updateRemoval = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
+        val updateRemoval = repository.createOrUpdate(id, "form1", emptyJsonObject).futureValue
 
         updateRemoval.updateType shouldBe a [Updated[_]]
-        val updated = await(repository.findById(id)).get
-        updated.atomicId.get shouldBe a [BSONObjectID]
+        val updated = repository.findById(id).futureValue.value
+        updated.atomicId.value shouldBe a [BSONObjectID]
 
-        (updated.data.get \ "form1").get shouldBe emptyJsonObject
+        (updated.data.value \ "form1").toEither.right.value shouldBe emptyJsonObject
       }
-
     }
 
     "applying empty JSON on an existing key " should {
@@ -375,25 +371,25 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
         val repository = repo("unsetJSValue")
         val id: Id = "testClearJsValueIdB"
 
-        val insertCheck = await(repository.createOrUpdate(id, "form1", sampleFormData1Json))
+        val insertCheck = repository.createOrUpdate(id, "form1", sampleFormData1Json).futureValue
         insertCheck.updateType shouldBe a [Saved[_]]
 
-        val insertCheck2 = await(repository.createOrUpdate(id, "form2", sampleFormData2Json))
+        val insertCheck2 = repository.createOrUpdate(id, "form2", sampleFormData2Json).futureValue
         insertCheck2.updateType shouldBe a [Updated[_]]
 
-        val original = await(repository.findById(id)).get
-        original.atomicId.get shouldBe a [BSONObjectID]
-        (original.data.get \ "form1").get shouldBe sampleFormData1Json
-        (original.data.get \ "form2").get shouldBe sampleFormData2Json
+        val original = repository.findById(id).futureValue.value
+        original.atomicId.value shouldBe a [BSONObjectID]
+        (original.data.value \ "form1").toEither.right.value shouldBe sampleFormData1Json
+        (original.data.value \ "form2").toEither.right.value shouldBe sampleFormData2Json
 
-        val updateCheck = await(repository.createOrUpdate(id, "form1", emptyJsonObject))
+        val updateCheck = repository.createOrUpdate(id, "form1", emptyJsonObject).futureValue
         updateCheck.updateType shouldBe a [Updated[_]]
 
-        val updated = await(repository.findById(id)).get
-        updated.atomicId.get shouldBe a [BSONObjectID]
+        val updated = repository.findById(id).futureValue.value
+        updated.atomicId.value shouldBe a [BSONObjectID]
 
-        (updated.data.get \ "form1").get.asOpt[String] shouldBe None
-        (updated.data.get \ "form2").get shouldBe sampleFormData2Json
+        (updated.data.value \ "form1").toEither.right.value.asOpt[String] shouldBe None
+        (updated.data.value \ "form2").toEither.right.value shouldBe sampleFormData2Json
       }
     }
   }
@@ -401,16 +397,16 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
   "KeyStoreMongoRepository" should {
     "replace the value expireAfterSeconds in the index dateUpdatedIndex when the configuration value expireAfterSeconds has changed" in {
       val repository = repo("replaceIndex")
-      val indexes = await(repository.collection.indexesManager.list())
+      val indexes = repository.collection.indexesManager.list().futureValue
       indexes.size shouldNot be(0)
       val oldIndex = indexes.find { index =>
         index.eventualName == "lastUpdatedIndex"
       }
       oldIndex.isDefined shouldBe true
-      oldIndex.get.options.get("expireAfterSeconds") shouldBe Some(BSONLong(expireAfter28DaysInSeconds))
+      oldIndex.value.options.get("expireAfterSeconds") shouldBe Some(BSONLong(expireAfter28DaysInSeconds))
       val modifiedRepository = repo("replaceIndex", 8888888)
       eventually {
-        val index = await(modifiedRepository.collection.indexesManager.list())
+        val index = modifiedRepository.collection.indexesManager.list().futureValue
                       .find(index => index.eventualName == "lastUpdatedIndex")
         index.value.options.get("expireAfterSeconds").value shouldBe BSONLong(8888888)
       }
@@ -419,7 +415,7 @@ class CacheRepositorySpec extends WordSpecLikeWithRetries with Matchers with Mon
     "do not find document" in {
       val repository = repo("doNotFindRepo")
       val id: Id = "someId"
-      await(repository.findById(id)).isEmpty shouldBe true
+      repository.findById(id).futureValue.isEmpty shouldBe true
     }
 
     // This test is intentionally commented out. Enable it locally to test that the removal of expired documents works.
