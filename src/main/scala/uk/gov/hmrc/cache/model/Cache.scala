@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,20 @@
 package uk.gov.hmrc.cache.model
 
 import play.api.libs.json._
- import reactivemongo.bson.BSONObjectID
- import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
+import reactivemongo.bson.BSONObjectID
+import uk.gov.hmrc.mongo.CreationAndLastModifiedDetail
 
- case class Cache(id: Id,
-                  data: Option[JsValue] = None,
-                  modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(),
-                  atomicId:Option[BSONObjectID]=None) extends Cacheable {
-}
+case class Cache(
+  id             : Id,
+  data           : Option[JsValue]               = None,
+  modifiedDetails: CreationAndLastModifiedDetail = CreationAndLastModifiedDetail(),
+  atomicId       : Option[BSONObjectID]          = None
+) extends Cacheable
 
 object Cache {
   import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 
-  final val DATA_ATTRIBUTE_NAME="data"
+  final val DATA_ATTRIBUTE_NAME = "data"
 
   implicit val format = ReactiveMongoFormats.objectIdFormats
   implicit val cacheFormat = Json.format[Cache]

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,13 @@
 
 package uk.gov.hmrc.cache
 
-import play.api.Play
+import com.typesafe.config.{Config, ConfigFactory}
+import scala.concurrent.duration.DurationLong
 
 trait TimeToLive {
 
-  import scala.concurrent.duration.{MINUTES, Duration}
+  private[cache] def config: Config = ConfigFactory.load()
 
-  private val fiveMinutes = 5L
-
-  lazy val defaultExpireAfter: Long = Duration(
-    Play.current.configuration.getMilliseconds("cache.expiryInMinutes").getOrElse(fiveMinutes), MINUTES
-  ).toSeconds
+  lazy val defaultExpireAfter: Long =
+    config.getLong("cache.expiryInMinutes").minutes.toSeconds
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.cache
 
-import org.scalatest.{Failed, Outcome, Retries}
-import org.scalatest._
+import org.scalatest.{BeforeAndAfterEach, Failed, Outcome, Retries}
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 
-abstract class WordSpecLikeWithRetries extends WordSpecLike with Retries {
+abstract class WordSpecLikeWithRetries extends AnyWordSpecLike with Retries {
   this: BeforeAndAfterEach =>
 
   protected[this] val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -28,9 +28,8 @@ abstract class WordSpecLikeWithRetries extends WordSpecLike with Retries {
   // Number of times to rerun the test before giving up
   val retries = 50
 
-  override def withFixture(test: NoArgTest): Outcome = {
+  override def withFixture(test: NoArgTest): Outcome =
     if (isRetryable(test)) withFixture(test, retries) else super.withFixture(test)
-  }
 
   def withFixture(test: NoArgTest, count: Int): Outcome = {
     beforeEach() // Be completely sure we're starting fresh, in the retried tests

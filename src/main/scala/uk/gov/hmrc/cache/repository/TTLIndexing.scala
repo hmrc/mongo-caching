@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ trait TTLIndexing[A] {
         collection.indexesManager.drop(index.eventualName).flatMap(_ => ensureLastUpdated)
       }
     }
-    Logger.info(s"Creating time to live for entries in ${collection.name} to $expireAfterSeconds seconds")
+    Logger("application").info(s"Creating time to live for entries in ${collection.name} to $expireAfterSeconds seconds")
     ensureLastUpdated
   }
 
@@ -73,15 +73,18 @@ trait TTLIndexing[A] {
  * deleted <- collection.db.command(DeleteIndex(collection.name, idxToUpdate.get.eventualName))
  */
 sealed case class DeleteIndex(
-                               collection: String,
-                               index: String) extends Command[Int] {
-  override def makeDocuments = BSONDocument(
-    "deleteIndexes" -> BSONString(collection),
-    "index" -> BSONString(index))
+  collection: String,
+  index     : String
+) extends Command[Int] {
+  override def makeDocuments =
+    BSONDocument(
+      "deleteIndexes" -> BSONString(collection),
+      "index"         -> BSONString(index)
+    )
 
   object ResultMaker extends BSONCommandResultMaker[Int] {
     def apply(document: BSONDocument) =
-      CommandError.checkOk(document, Some("deleteIndexes")).toLeft(document.getAs[BSONInteger]("nIndexesWas").map(_.value).get)
+      CommandError.checkOk(document, Some("deleteIndexes"))
+        .toLeft(document.getAs[BSONInteger]("nIndexesWas").map(_.value).get)
   }
-
 }

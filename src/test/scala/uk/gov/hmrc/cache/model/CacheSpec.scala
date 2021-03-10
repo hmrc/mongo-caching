@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 HM Revenue & Customs
+ * Copyright 2021 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@
 package uk.gov.hmrc.cache.model
 
 import org.scalatest.LoneElement
-import play.api.libs.json._
-import org.scalatest.{WordSpecLike, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
+import play.api.libs.json.Json
 
-class CacheSpec extends WordSpecLike with Matchers with LoneElement {
+class CacheSpec extends AnyWordSpecLike with Matchers with LoneElement {
 
   val json = Json.parse( """ {
         |"form1": {
