@@ -1,6 +1,6 @@
 # mongo-caching
 
-
+*Consider using https://github.com/hmrc/hmrc-mongo#cache instead*
 
 Micro-library containing functionality to cache generic JSON data in MongoDB
 
